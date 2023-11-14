@@ -35,6 +35,10 @@ if __name__ == "__main__":
                         help="Number of threads to use for building and emerging software")
     parser.add_argument("-d", "--download-dir", type=pathlib.Path, default=os.getcwd(),
                         help="Path to the desired download directory (default: current)")
+    parser.add_argument("--openrc", dest="profile", action="store_const", const="openrc",
+                        help="Select OpenRC as the Gentoo Init System")
+    parser.add_argument("--systemd", dest="profile", action="store_const", const="systemd",
+                        help="Select SystemD as the Gentoo Init System")
 
     subparsers = parser.add_subparsers(help="gencloud actions", dest="action")
     subparsers.required = True

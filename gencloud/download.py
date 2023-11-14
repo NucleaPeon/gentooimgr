@@ -1,5 +1,4 @@
-"""Module to handle downloading and verification of Gentoo images
-"""
+"""Module to handle downloading and verification of Gentoo images"""
 import os
 import re
 import sys
@@ -42,8 +41,8 @@ def parse_latest_text(fullpath) -> tuple:
 def verify(args, _type: str, filename: str) -> bool:
     """Downloads hash file and run a hash check on the file
     :Parameters:
+        - args: Namespace of parsed arguments
         - _type: str hash type
-        - download_dir: str path to download directory
         - filename: str name of file to check (used to download corresponding hash file)
 
             A install-amd64-minimal-20231112T170154Z.iso file will have a
@@ -67,7 +66,6 @@ def verify(args, _type: str, filename: str) -> bool:
         content = f.read()
         m_isohash = ioshashpattern.search(content)
         _hash = m_isohash.group(1)
-        print(_hash, hd, m_isohash)
         assert hd == _hash
 
 
@@ -109,4 +107,3 @@ def download(args, url=None) -> str:
     verify(args, hashtype, filename)
 
     return fullpath
-
