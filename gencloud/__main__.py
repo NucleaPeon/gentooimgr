@@ -1,3 +1,4 @@
+import os
 import argparse
 import pathlib
 import multiprocessing
@@ -8,7 +9,6 @@ def main(args):
     if args.action == "build":
         import gencloud.builder
         gencloud.builder.build(args)
-
 
     elif args.action == "run":
         import gencloud.run
@@ -33,6 +33,8 @@ if __name__ == "__main__":
                         default="/tmp", help="Path to temporary directory for downloading files")
     parser.add_argument("-j", "--threads", type=int, default=multiprocessing.cpu_count(),
                         help="Number of threads to use for building and emerging software")
+    parser.add_argument("-d", "--download-dir", type=pathlib.Path, default=os.getcwd(),
+                        help="Path to the desired download directory (default: current)")
 
     subparsers = parser.add_subparsers(help="gencloud actions", dest="action")
     subparsers.required = True

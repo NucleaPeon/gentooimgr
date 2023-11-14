@@ -1,5 +1,3 @@
-import os
-
 # Define memory (in Mb)
 QEMU_MEMORY = 512
 # Define threads to compile packages with
@@ -10,8 +8,7 @@ GENTOO_BASE_URL = f"https://distfiles.gentoo.org/releases/{ARCHITECTURE}/autobui
 GENTOO_LATEST_FILE = f"latest-install-{ARCHITECTURE}-minimal.txt"
 GENTOO_FILE_HASH_RE = r"^Hash\: ([\w]*)$"
 GENTOO_FILE_ISO_RE = r"^(install-[\w\-_\.]*.iso) ([\d]*)"
-
-TEMPORARY_DIRECTORY = os.path.join(os.sep, "tmp")
+GENTOO_FILE_ISO_HASH_RE = r"^([\w]*)  (install-[\w\-_\.]*.iso)$"
 
 # Default list of packages to install. Can be overridden, but probably shouldn't
 BASE_PACKAGES = [

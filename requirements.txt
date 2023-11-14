@@ -1,3 +1,4 @@
 pydantic
 typing
-requests
+urllib
+progressbar
