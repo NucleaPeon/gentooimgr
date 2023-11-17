@@ -6,3 +6,10 @@ __pycache__/
 *.kate-swp
 *.txt
 *.iso*
+*.tar.xz
+*.tar.bz2
+*.md5sum
+*.sha256
+*.sha512
+*.img
+*.img.log
