@@ -56,6 +56,13 @@ def step4_binds(args, cfg):
     print(f"\t:: Now that binds are mounted, you can run individual commands via `python -m gencloud command [...]`.")
     completestep(4, "binds")
 
+def step5_portage(args, cfg):
+    # tar -xjpf "${PORTAGE}" -C /mnt/gentoo/usr/
+    print(f'\t:: Step 5: Portage')
+    proc = Popen(["tar", "-xjpf", cfg.get("portage"), "-C". f'{gencloud.config.GENTOO_MOUNT}/usr/'])
+    proc.communicate()
+    completestep(3, "stage3")
+
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
         f.write("done.")  # text in this file is not currently used.
@@ -95,6 +102,7 @@ def configure(args):
     # extract stage
     if not stepdone(3): step3_stage3(args, cfg)
     # mount binds
+    if not stepdone(4): step4_binds(args, cfg)
     # extract portage
     # Set licenses
     # repos.conf

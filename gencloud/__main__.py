@@ -30,8 +30,10 @@ def main(args):
     elif args.action == "cloud-cfg":
         import gencloud.cloud
         gencloud.cloud.configure(args)
+
     elif args.action == "command":
-        pass
+        import gencloud.command
+        gencloud.command.command()
 
 if __name__ == "__main__":
     """Gentoo Cloud Image Builder Utility"""
@@ -72,7 +74,6 @@ if __name__ == "__main__":
     parser_run.add_argument("-m", "--mounts", nargs='+', default=[],
                             help="Path to iso files to mount into the running qemu instance")
 
-
     parser_test = subparsers.add_parser('test', help="Test whether image is a legitamite cloud configured image")
 
     parser_clean = subparsers.add_parser('clean', help="Remove all downloaded files")
@@ -83,7 +84,10 @@ if __name__ == "__main__":
     parser_cloud = subparsers.add_parser("cloud-cfg", help="Configure a guest qemu VM with cloud image infrastructure")
     parser_cloud.add_argument("--virtio", action="store_true",
                               help="Configure kernel with virtio support for bare metal")
+
     parser_cmd = subparsers.add_parser('command', help="Run commands in a gentoo live cd chroot")
+    parser_cmd.add_argument("cmds", nargs='*',
+                            help="Commands to run (quote each command if more than one word, ie: \"grep 'foo'\" \"echo foo\")")
 
     args = parser.parse_args()
 
