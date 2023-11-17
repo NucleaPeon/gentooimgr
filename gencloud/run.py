@@ -19,7 +19,8 @@ def run(args, image: str = gencloud.config.GENTOO_IMG_NAME):
             mounts = [iso]
 
         for m in args.mounts:
-            pass
+            if os.path.exists(m):
+                mounts.append(m)
 
         print(f"\t:: Mounts: {isos[0]}")
         gencloud.qemu.run_image(isos[0], image=image, mount_isos=mounts)

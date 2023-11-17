@@ -1,16 +1,17 @@
 import os
 import sys
 import time
+import copy
 import json
 from subprocess import Popen, PIPE
 
-import gencloud.config as config
+import gencloud.config
 
 def older_than_a_day(fullpath):
     if not os.path.exists(fullpath):
         return True  # Don't fail on missing files
     filetime = os.path.getmtime(fullpath)
-    return time.time() - filetime > config.DAY_IN_SECONDS
+    return time.time() - filetime > gencloud.config.DAY_IN_SECONDS
 
 
 def find_iso(download_dir):
@@ -62,10 +63,10 @@ def portage_from_dir(d, filename=None):
             found.append(f)
 
     if len(found) > 1:
-        sys.stderr.write("More than one portage file exists, please specify the exact portage file or remove all others\n")
+        sys.stderr.write("\tEE: More than one portage file exists, please specify the exact portage file or remove all others\n")
         sys.stderr.write(''.join([f"\t{f}\n" for f in found]))
         sys.stderr.write(f"in {d}\n")
-        return None
+        sys.exit(1)
 
     return found[0] if found else None
 
@@ -96,26 +97,26 @@ def stage3_from_dir(d, filename=None):
 def generatecfg(args, config="gentoo.cfg"):
     path = args.download_dir
     cfgpath = os.path.join(path, config)
-    cfg = {}
+    cfg = copy.deepcopy(gencloud.config.CLOUD_CFG)  # Use defaults only
     if os.path.exists(cfgpath):
-        with open(cfgpath, 'r') as f:
-            cfg = json.loads(f.read())
-
-    else:
-        cfg.update(gencloud.config.CLOUD_CFG)
-        with open(cfgpath, 'w') as f:
-            f.write(json.dumps(cfg))
+        try:
+            with open(cfgpath, 'r') as f:
+                cfg.update(json.loads(f.read()))
+        except:
+            print("\tEE: Specified config file doesn't exist or cannot be loaded as json")
 
     return cfg
 
 def load_config(args):
     cfg = generatecfg(args)
     if args.config:
-        cfgoverride = generatecfg(args, config=args.config)
+        override = generatecfg(args, config=args.config)
         cfg.update(cfgoverride)
 
-    cfg['portage'] = portage_from_dir(args.download_dir, filename=cfg.get("portage"))
-    cfg['stage3'] = stage3_from_dir(args.download_dir, filename=cfg.get("stage3"))
+    if cfg.get("portage") is None:
+        cfg['portage'] = portage_from_dir(args.download_dir, filename=cfg.get("portage"))
+    if cfg.get("stage3") is None:
+        cfg['stage3'] = stage3_from_dir(args.download_dir, filename=cfg.get("stage3"))
 
     return cfg
 

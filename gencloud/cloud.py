@@ -11,6 +11,7 @@ import gencloud.config
 import gencloud.common
 
 def step1_diskprep(args, cfg):
+    print("\t:: Step 1: Disk Partitioning")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = [
@@ -27,9 +28,33 @@ def step1_diskprep(args, cfg):
     completestep(1, "diskprep")
 
 def step2_mount(args, cfg):
+    print(f'\t:: Step 2: Mounting {gencloud.config.GENTOO_MOUNT}')
     proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', gencloud.config.GENTOO_MOUNT])
     proc.communicate()
     completestep(2, "mount")
+
+def step3_stage3(args, cfg):
+    print(f'\t:: Step 3: Stage3 Tarball')
+    proc = Popen(["tar", "xpf", cfg.get("stage3"), "--xattrs-include='*.*'", "--numeric-owner" "-C".
+                  f'{gencloud.config.GENTOO_MOUNT}'])
+    proc.communicate()
+    completestep(3, "stage3")
+
+def step4_binds(args, cfg):
+    print(f'\t:: Step 4: Binding Filesystems')
+    for b in [
+        ['mount', '--types', 'proc', '/proc', '/mnt/gentoo/proc'],
+        ['mount', '--rbind', '/sys', '/mnt/gentoo/sys'],
+        ['mount', '--make-rslave', '/mnt/gentoo/sys'],
+        ['mount', '--rbind', '/dev', '/mnt/gentoo/dev'],
+        ['mount', '--make-rslave', '/mnt/gentoo/dev'],
+        ['mount', '--bind', '/run', '/mnt/gentoo/run'],
+        ['mount', '--make-slave', '/mnt/gentoo/run']]:
+        proc = Popen(b)
+        proc.communicate()
+
+    print(f"\t:: Now that binds are mounted, you can run individual commands via `python -m gencloud command [...]`.")
+    completestep(4, "binds")
 
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
@@ -64,11 +89,11 @@ def configure(args):
             os.makedirs(gencloud.config.GENTOO_MOUNT)
     # disk prep
     cfg = gencloud.common.load_config(args)
-    print(f"\t:: Configuration {cfg}")
     if not stepdone(1): step1_diskprep(args, cfg)
-    if not stepdone(2): step2_mount(args, cfg)
     # mount root
+    if not stepdone(2): step2_mount(args, cfg)
     # extract stage
+    if not stepdone(3): step3_stage3(args, cfg)
     # mount binds
     # extract portage
     # Set licenses

@@ -53,7 +53,6 @@ def run_image(
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ] + mounts
-
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     proc.communicate()
 
