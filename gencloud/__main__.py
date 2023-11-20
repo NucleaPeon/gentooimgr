@@ -35,6 +35,10 @@ def main(args):
         import gencloud.command
         gencloud.command.command()
 
+    elif args.action == "chroot":
+        import gencloud.chroot
+        gencloud.chroot.chroot(path=args.mountpoint, shell="/bin/bash")
+
 if __name__ == "__main__":
     """Gentoo Cloud Image Builder Utility"""
     parser = argparse.ArgumentParser(prog="gencloud", description="Gentoo Cloud Image Builder Utility")
@@ -85,7 +89,11 @@ if __name__ == "__main__":
     parser_cloud.add_argument("--virtio", action="store_true",
                               help="Configure kernel with virtio support for bare metal")
 
-    parser_cmd = subparsers.add_parser('command', help="Run commands in a gentoo live cd chroot")
+    parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit")
+    parser_chroot.add_argument("mountpoint", nargs='?', default=gencloud.config.GENTOO_MOUNT,
+                               help="Point to mount and run the chroot and shell")
+
+    parser_cmd = subparsers.add_parser('command', help="Handle bind mounts and run command(s) in guest chroot, then unmount binds")
     parser_cmd.add_argument("cmds", nargs='*',
                             help="Commands to run (quote each command if more than one word, ie: \"grep 'foo'\" \"echo foo\")")
 

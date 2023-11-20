@@ -6,9 +6,11 @@ will continue on if an error was to occur, unless --start-over flag is given.
 
 import os
 import sys
+import shutil
 from subprocess import Popen, PIPE
 import gencloud.config
 import gencloud.common
+import gencloud.chroot
 
 def step1_diskprep(args, cfg):
     print("\t:: Step 1: Disk Partitioning")
@@ -35,37 +37,50 @@ def step2_mount(args, cfg):
 
 def step3_stage3(args, cfg):
     print(f'\t:: Step 3: Stage3 Tarball')
-    proc = Popen(["tar", "xpf", cfg.get("stage3"), "--xattrs-include='*.*'", "--numeric-owner" "-C".
+    proc = Popen(["tar", "xpf", cfg.get("stage3"), "--xattrs-include='*.*'", "--numeric-owner" "-C",
                   f'{gencloud.config.GENTOO_MOUNT}'])
     proc.communicate()
     completestep(3, "stage3")
 
 def step4_binds(args, cfg):
     print(f'\t:: Step 4: Binding Filesystems')
-    for b in [
-        ['mount', '--types', 'proc', '/proc', '/mnt/gentoo/proc'],
-        ['mount', '--rbind', '/sys', '/mnt/gentoo/sys'],
-        ['mount', '--make-rslave', '/mnt/gentoo/sys'],
-        ['mount', '--rbind', '/dev', '/mnt/gentoo/dev'],
-        ['mount', '--make-rslave', '/mnt/gentoo/dev'],
-        ['mount', '--bind', '/run', '/mnt/gentoo/run'],
-        ['mount', '--make-slave', '/mnt/gentoo/run']]:
-        proc = Popen(b)
-        proc.communicate()
-
-    print(f"\t:: Now that binds are mounted, you can run individual commands via `python -m gencloud command [...]`.")
+    gencloud.chroot.bind(verbose=False)
     completestep(4, "binds")
 
 def step5_portage(args, cfg):
-    # tar -xjpf "${PORTAGE}" -C /mnt/gentoo/usr/
     print(f'\t:: Step 5: Portage')
-    proc = Popen(["tar", "-xjpf", cfg.get("portage"), "-C". f'{gencloud.config.GENTOO_MOUNT}/usr/'])
+    proc = Popen(["tar", "-xjpf", cfg.get("portage"), "-C", f"{gencloud.config.GENTOO_MOUNT}/usr/"])
     proc.communicate()
-    completestep(3, "stage3")
+    completestep(5, "portage")
+
+def step6_licenses(args, cfg):
+    print(f'\t:: Step 6: Licenses')
+    license_path = os.path.join(gencloud.config.GENTOO_MOUNT, 'etc', 'portage', 'package.license')
+    os.makedirs(license_path)
+    for f, licenses in gencloud.config.GENTOO_ACCEPT_LICENSES.items():
+        with open(f, 'w') as f:
+            f.write('\n'.join(licenses))
+    completestep(6, "license")
+
+def step7_repos(args, cfg):
+    print(f'\t:: Step 7: Emerge Sync Repo')
+    repo_path = os.path.join(gencloud.config.GENTOO_MOUNT, 'etc', 'portage', 'repos.conf')
+    os.makedirs(repo_path)
+    with open(os.path.join(repo_path, 'gentoo.conf'), 'w') as f:
+        f.write(gencloud.config.GENTOO_REPO_FILE)
+
+    completestep(7, "repos")
+
+def step8_resolv(args, cfg):
+    print(f'\t:: Step 8: Resolv')
+    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(gencloud.config.GENTOO_MOUNT, 'etc'])])
+    proc.communicate()
+    completestep(8, "resolv")
 
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
         f.write("done.")  # text in this file is not currently used.
+
 
 def getlaststep(prefix='/tmp'):
     i = 1

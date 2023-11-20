@@ -30,3 +30,7 @@ python -m gencloud cloud-cfg --virtio
 ```
 
 
+TODO
+----
+
+* [ ] Hash check portage downloads on ``build``

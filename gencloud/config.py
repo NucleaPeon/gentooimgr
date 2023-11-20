@@ -26,6 +26,35 @@ GENTOO_FILE_ISO_HASH_RE = r"^([\w]*)  (install-[\w\-_\.]*.iso)$"
 GENTOO_FILE_STAGE3_RE = r"^(stage3-[\w\-_\.]*.tar.*) ([\d]*)"
 GENTOO_FILE_STAGE3_HASH_RE = r"^([\w]*)  (stage3-[\w\-_\.]*.tar.*)$"
 
+# Dict of "filename": ["package-name license-accepted"]
+GENTOO_ACCEPT_LICENSE = {
+    'kernel': ["sys-kernel/linux-firmware linux-fw-redistributable"]
+}
+
+# Currently we only deal with rsync uri's. Will need new feature branch to merge other methods
+GENTOO_SYNC_URI = "rsync://rsync.gentoo.org/gentoo-portage"
+# Allow overriding this file if need be
+GENTOO_REPO_FILE = f"""[DEFAULT]
+main-repo = gentoo
+
+[gentoo]
+location = /var/db/repos/gentoo
+sync-type = rsync
+sync-uri = {GENTOO_SYNC_URI}
+auto-sync = yes
+sync-rsync-verify-jobs = 1
+sync-rsync-verify-metamanifest = yes
+sync-rsync-verify-max-age = 24
+sync-openpgp-key-path = /usr/share/openpgp-keys/gentoo-release.asc
+sync-openpgp-keyserver = hkps://keys.gentoo.org
+sync-openpgp-key-refresh-retry-count = 40
+sync-openpgp-key-refresh-retry-overall-timeout = 1200
+sync-openpgp-key-refresh-retry-delay-exp-base = 2
+sync-openpgp-key-refresh-retry-delay-max = 60
+sync-openpgp-key-refresh-retry-delay-mult = 4
+sync-webrsync-verify-signature = yes
+"""
+
 # Default list of packages to install. Can be overridden, but probably shouldn't
 BASE_PACKAGES = [
     "acpid",
@@ -63,6 +92,9 @@ BASE_PACKAGES = [
     "sys-block/open-iscsi",
     "sys-kernel/genkernel"
 ]
+
+# Services to add to the 'default' in rc-update or rely on default level using systemctl enable
+DEFAULT_SERVICES = []
 
 ADDITIONAL_PACKAGES = [
     # app-editors/vim
