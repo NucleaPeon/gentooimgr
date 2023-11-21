@@ -24,12 +24,12 @@ def bind(mount=gencloud.config.GENTOO_MOUNT, verbose=True):
 
 def unbind(mount=gencloud.config.GENTOO_MOUNT, verbose=True):
     unmounts = [
-        ["cd", "/"],
         ["umount", "-l", os.path.join(mount, 'dev', 'shm')],
         ["umount", "-l", os.path.join(mount, 'dev', 'pts')],
         ["umount", "-R", mount]
     ]
-    for uncmd in mounts:
+    os.chdir("/")
+    for uncmd in unmounts:
         if verbose:
             print(f"\t:: {' '.join(uncmd)}")
         proc = Popen(uncmd, stdout=PIPE, stderr=PIPE)
@@ -40,6 +40,8 @@ def unbind(mount=gencloud.config.GENTOO_MOUNT, verbose=True):
 
 def chroot(path=gencloud.config.GENTOO_MOUNT, shell="/bin/bash"):
     bind(mount=path)
+    os.chroot(path)
+    os.chdir(os.sep)
     os.system(shell)
     unbind(mount=path)
 

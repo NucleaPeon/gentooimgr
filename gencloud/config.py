@@ -32,7 +32,7 @@ GENTOO_ACCEPT_LICENSE = {
 }
 
 # Currently we only deal with rsync uri's. Will need new feature branch to merge other methods
-GENTOO_SYNC_URI = "rsync://rsync.gentoo.org/gentoo-portage"
+GENTOO_SYNC_URI = "rsync://192.168.254.20/gentoo-portage"
 # Allow overriding this file if need be
 GENTOO_REPO_FILE = f"""[DEFAULT]
 main-repo = gentoo
@@ -70,13 +70,10 @@ BASE_PACKAGES = [
     "postfix",
     "cloud-init",
     "app-editors/vim",
-    "gentoo-sources",
-    "linux-firmware",
     "parted",
     "portage-utils",
-    "gentoolkit",
     "bash-completion",
-    "gentoo-bashcom",
+    "gentoo-bashcomp",
     "eix",
     "tmux",
     "app-misc/screen",
@@ -89,8 +86,31 @@ BASE_PACKAGES = [
     "sys-block/gpart",
     "net-misc/ntp",
     "net-fs/nfs-utils",
-    "sys-block/open-iscsi",
-    "sys-kernel/genkernel"
+    "sys-block/open-iscsi"
+]
+
+ONESHOT_UPDATE_PKGS = [
+    "portage"
+]
+
+EMERGE_SINGLE_PKGS = [
+    "app-portage/eix",
+    "dev-util/cmake"
+]
+
+EMERGE_KEEP_GOING_PKGS = [
+    "openssh"
+]
+
+KERNEL_PACKAGES = [
+    "sys-kernel/genkernel",
+    "gentoo-sources",
+    "gentoolkit",
+    "linux-firmware"
+]
+
+BOOTLOADER_PACKAGES = [
+    "grub:2"
 ]
 
 # Services to add to the 'default' in rc-update or rely on default level using systemctl enable
@@ -106,7 +126,10 @@ CLOUD_CFG = {
     "disk": "/dev/vda",
     "partition": 1,
     "makeopts-j": THREADS,  # -jX during compile
-    "jobcount": 4,
+    "jobcount": THREADS,
     "packages": []  # Additional packages
 }
 
+CLOUD_MODULES = [
+    "iscsi_tcp"
+]

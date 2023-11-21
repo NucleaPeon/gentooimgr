@@ -180,7 +180,7 @@ def download(args, url=None) -> str:
     fullpath = os.path.join(args.download_dir, filename)
     if not os.path.exists(fullpath) or args.redownload :
         print(f"Downloading {filename}")
-        url = os.path.join(config.GENTOO_BASE_URL, filename)
+        url = os.path.join(config.GENTOO_BASE_ISO_URL, filename)
         urlretrieve(url, fullpath, DownloadProgressBar())
 
     # Verify byte size

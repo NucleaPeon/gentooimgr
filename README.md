@@ -34,3 +34,6 @@ TODO
 ----
 
 * [ ] Hash check portage downloads on ``build``
+* [ ] --skip-update-check : Do not even attempt to download new files in any capacity, simply use the latest ones found.
+        We could implement a way to find by glob and filter by modified by state and simply use the latest modified file
+        each and every time so we don't fail on multiple file detections

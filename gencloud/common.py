@@ -40,6 +40,8 @@ def make_iso_from_dir(mydir):
         "-J",
         "-r",
         "-V", "gencloud",
+        "-m", "*.img",
+        "-m", "*.iso",
         "-o", path,
         mydir
         ], stdout=PIPE, stderr=PIPE)
