@@ -7,9 +7,9 @@ will continue on if an error was to occur, unless --start-over flag is given.
 import os
 import sys
 from subprocess import Popen, PIPE
-import gencloud.config
-import gencloud.common
-import gencloud.chroot
+import gentooimgr.config
+import gentooimgr.common
+import gentooimgr.chroot
 
 def step1_diskprep(args, cfg):
     print("\t:: Step 1: Disk Partitioning")
@@ -28,60 +28,60 @@ def step1_diskprep(args, cfg):
     completestep(1, "diskprep")
 
 def step2_mount(args, cfg):
-    print(f'\t:: Step 2: Mounting {gencloud.config.GENTOO_MOUNT}')
-    proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', gencloud.config.GENTOO_MOUNT])
+    print(f'\t:: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}')
+    proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', gentooimgr.config.GENTOO_MOUNT])
     proc.communicate()
     completestep(2, "mount")
 
 def step3_stage3(args, cfg):
     print(f'\t:: Step 3: Stage3 Tarball')
     proc = Popen(["tar", "xpf", cfg.get("stage3"), "--xattrs-include='*.*'", "--numeric-owner", "-C",
-                  f'{gencloud.config.GENTOO_MOUNT}'])
+                  f'{gentooimgr.config.GENTOO_MOUNT}'])
     proc.communicate()
     completestep(3, "stage3")
 
 def step4_binds(args, cfg):
     print(f'\t:: Step 4: Binding Filesystems')
-    gencloud.chroot.bind(verbose=False)
+    gentooimgr.chroot.bind(verbose=False)
     completestep(4, "binds")
 
 def step5_portage(args, cfg):
     print(f'\t:: Step 5: Portage')
-    proc = Popen(["tar", "xpf", cfg.get("portage"), "-C", f"{gencloud.config.GENTOO_MOUNT}/usr/"])
+    proc = Popen(["tar", "xpf", args.portage or cfg.get("portage"), "-C", f"{gentooimgr.config.GENTOO_MOUNT}/usr/"])
     proc.communicate()
     completestep(5, "portage")
 
 def step6_licenses(args, cfg):
     print(f'\t:: Step 6: Licenses')
-    license_path = os.path.join(gencloud.config.GENTOO_MOUNT, 'etc', 'portage', 'package.license')
-    os.makedirs(license_path)
-    for f, licenses in gencloud.config.GENTOO_ACCEPT_LICENSE.items():
+    license_path = os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc', 'portage', 'package.license')
+    os.makedirs(license_path, exist_ok=True)
+    for f, licenses in gentooimgr.config.GENTOO_ACCEPT_LICENSE.items():
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
     completestep(6, "license")
 
 def step7_repos(args, cfg):
     print(f'\t:: Step 7: Emerge Sync Repo')
-    repo_path = os.path.join(gencloud.config.GENTOO_MOUNT, 'etc', 'portage', 'repos.conf')
+    repo_path = os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc', 'portage', 'repos.conf')
     os.makedirs(repo_path)
     with open(os.path.join(repo_path, 'gentoo.conf'), 'w') as f:
-        f.write(gencloud.config.GENTOO_REPO_FILE)
+        f.write(gentooimgr.config.GENTOO_REPO_FILE)
 
     completestep(7, "repos")
 
 def step8_resolv(args, cfg):
     print(f'\t:: Step 8: Resolv')
-    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(gencloud.config.GENTOO_MOUNT, 'etc')])
+    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc')])
     proc.communicate()
     # Copy all step files and python module to new chroot
-    os.system(f"cp /tmp/*.step {gencloud.config.GENTOO_MOUNT}/tmp")
-    os.system(f"cp -r /mnt/gencloud {gencloud.config.GENTOO_MOUNT}/mnt/")
+    os.system(f"cp /tmp/*.step {gentooimgr.config.GENTOO_MOUNT}/tmp")
+    os.system(f"cp -r /mnt/gi {gentooimgr.config.GENTOO_MOUNT}/mnt/")
     completestep(8, "resolv")
 
 def step9_sync(args, cfg):
     print(f"\t:: Step 9: sync")
     print("\t\t:: Entering chroot")
-    os.chroot(gencloud.config.GENTOO_MOUNT)
+    os.chroot(gentooimgr.config.GENTOO_MOUNT)
     os.chdir(os.sep)
 
     proc = Popen(["emerge", "--sync", "--quiet"])
@@ -90,23 +90,23 @@ def step9_sync(args, cfg):
 
 def step10_emerge_pkgs(args, cfg):
     print(f"\t:: Step 10: emerge pkgs")
-    for oneshot_up in gencloud.config.ONESHOT_UPDATE_PKGS:
+    for oneshot_up in gentooimgr.config.ONESHOT_UPDATE_PKGS:
         proc = Popen(["emerge", "--oneshot", "--update", oneshot_up])
         proc.communicate()
 
-    for single in gencloud.config.EMERGE_SINGLE_PKGS:
+    for single in gentooimgr.config.EMERGE_SINGLE_PKGS:
         proc = Popen(["emerge", single])
         proc.communicate()
 
-    for keepgoing in gencloud.config.EMERGE_KEEP_GOING_PKGS:
+    for keepgoing in gentooimgr.config.EMERGE_KEEP_GOING_PKGS:
         proc = Popen(["emerge", keepgoing])
         proc.communicate()
 
-    cmd = ["emerge", "-j", gencloud.config.THREADS, "--keep-going"]
-    cmd += gencloud.config.KERNEL_PACKAGES
-    cmd += gencloud.config.BASE_PACKAGES
-    cmd += gencloud.config.ADDITIONAL_PACKAGES
-    cmd += gencloud.config.BOOTLOADER_PACKAGES
+    cmd = ["emerge", "-j", str(gentooimgr.config.THREADS), "--keep-going"]
+    cmd += gentooimgr.config.KERNEL_PACKAGES
+    cmd += gentooimgr.config.BASE_PACKAGES
+    cmd += gentooimgr.config.ADDITIONAL_PACKAGES
+    cmd += gentooimgr.config.BOOTLOADER_PACKAGES
     proc = Popen(cmd)
     proc.communicate()
     completestep(10, "pkgs")
@@ -117,12 +117,11 @@ def step11_kernel(args, cfg):
     proc = Popen(["eselect", "kernel", "set", "1"])
     proc.communicate()
     os.chdir(os.path.join(os.sep, 'usr', 'src', 'linux'))
-    threads = str(gencloud.config.THREADS)
+    threads = str(gentooimgr.config.THREADS)
     for cmd in [
         ["make", "defconfig", "-j", threads],
         ["make", "kvm_guest", "-j", threads],  # This should be toggled with --virtio option (--config-kvm?)
-        ["make", "-j", threads],
-        ["make", "install"]]:
+        ["genkernel", "all"]]:
         proc = Popen(cmd)
         proc.communicate()
 
@@ -130,11 +129,11 @@ def step11_kernel(args, cfg):
 
 def step12_grub(args, cfg):
     print(f"\t:: Step 12: kernel")
-    proc = Popen(["grub-install", gencloud.config.CLOUD_CFG['disk']])
+    proc = Popen(["grub-install", gentooimgr.config.CLOUD_CFG['disk']])
     proc.communicate()
     code = proc.returncode
     if code != 0:
-        sys.stderr.write(f"Failed to install grub on {gencloud.config.CLOUD_CFG['disk']}\n")
+        sys.stderr.write(f"Failed to install grub on {gentooimgr.config.CLOUD_CFG['disk']}\n")
         sys.exit(code)
 
     proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
@@ -163,6 +162,7 @@ def step14_services(args, cfg):
 
 def step15_ethnaming(args, cfg):
     print(f"\t:: Step 15: Eth Naming")
+    completestep(15, "networking")
 
 def step16_sysconfig(args, cfg):
     print(f"\t:: Step 16: Sysconfig")
@@ -178,15 +178,13 @@ def step16_sysconfig(args, cfg):
     proc.communicate()
     proc = Popen(["env-update"])
     proc.communicate()
-    proc = Popen(["source /etc/profile"])
-    proc.communicate()
     with open('/etc/sysctl.d/swappiness.conf', 'w') as f:
         f.write("vm.swappiness = 0\n")
 
     modloadpath = os.path.join(os.sep, 'etc', 'modules-load.d')
     os.makedirs(modloadpath)
     with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
-        f.write('\n'.join(gencloud.config.CLOUD_MODULES))
+        f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
 
     proc = Popen("sed -i 's/domain_name\,\ domain_search\,\ host_name/domain_search/g' /etc/dhcpcd.conf", shell=True)
     proc.communicate()
@@ -194,12 +192,19 @@ def step16_sysconfig(args, cfg):
     with open('/etc/conf.d/hostname', 'w') as f:
         f.write("localhost\n")
 
+    proc = Popen(["eix-update"])
+    proc.communicate()
+
+    os.remove(os.path.join(os.sep, 'etc', 'resolv.conf'))
+
     completestep(16, "sysconfig")
 
 def step17_fstab(args, cfg):
     print(f"\t:: Step 17: fstab")
+    with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
+        fstab.write(f"{gentooimgr.config.CLOUD_CFG.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
 
-    #completestep(17, "fstab")
+    completestep(17, "fstab")
 
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
@@ -223,18 +228,18 @@ def stepdone(step, prefix='/tmp'):
 
 def configure(args):
     # Load configuration
-    if not os.path.exists(gencloud.config.GENTOO_MOUNT):
+    if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         if not args.force:
             # We aren't in a gentoo live cd are we?
             sys.stderr.write("Your system doesn't look like a gentoo live cd, exiting for safety.\n"
-                "If you want to continue, use --force option and re-run `python -m gencloud cloud-cfg`\n")
+                "If you want to continue, use --force option and re-run `python -m gentooimgr cloud-cfg`\n")
             sys.exit(1)
 
         else:
             # Assume we are root as per live cd, otherwise user should run this as root as a secondary confirmation
-            os.makedirs(gencloud.config.GENTOO_MOUNT)
+            os.makedirs(gentooimgr.config.GENTOO_MOUNT)
     # disk prep
-    cfg = gencloud.common.load_config(args)
+    cfg = gentooimgr.common.load_config(args)
     if not stepdone(1): step1_diskprep(args, cfg)
     # mount root
     if not stepdone(2): step2_mount(args, cfg)
@@ -265,12 +270,14 @@ def configure(args):
     if not stepdone(14): step14_services(args, cfg)
     # eth0 naming
     # timezone
-
+    if not stepdone(15): step15_ethnaming(args, cfg)
     # locale
     # set some sysctl things
     # set some dhcp things
     # hostname
+    if not stepdone(16): step16_sysconfig(args, cfg)
     # fstab
+    if not stepdone(17): step17_fstab(args, cfg)
     # copy cloud cfg?
-    gencloud.chroot.unbind()
+    gentooimgr.chroot.unbind()
     # Finish install processes like emaint and eix-update and news read

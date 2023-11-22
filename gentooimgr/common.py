@@ -5,13 +5,13 @@ import copy
 import json
 from subprocess import Popen, PIPE
 
-import gencloud.config
+import gentooimgr.config
 
 def older_than_a_day(fullpath):
     if not os.path.exists(fullpath):
         return True  # Don't fail on missing files
     filetime = os.path.getmtime(fullpath)
-    return time.time() - filetime > gencloud.config.DAY_IN_SECONDS
+    return time.time() - filetime > gentooimgr.config.DAY_IN_SECONDS
 
 
 def find_iso(download_dir):
@@ -26,7 +26,7 @@ def find_iso(download_dir):
     return found
 
 def make_iso_from_dir(mydir):
-    """ Generates an iso with gencloud inside it for use inside a live cd guest
+    """ Generates an iso with gentooimgr inside it for use inside a live cd guest
     :Returns:
         path to iso that was created or NoneType if mydir is not found
     """
@@ -39,7 +39,7 @@ def make_iso_from_dir(mydir):
         "--input-charset", "utf-8",
         "-J",
         "-r",
-        "-V", "gencloud",
+        "-V", "gentooimgr",
         "-m", "*.img",
         "-m", "*.iso",
         "-o", path,
@@ -65,7 +65,7 @@ def portage_from_dir(d, filename=None):
             found.append(f)
 
     if len(found) > 1:
-        sys.stderr.write("\tEE: More than one portage file exists, please specify the exact portage file or remove all others\n")
+        sys.stderr.write("\tEE: More than one portage file exists, please specify the exact portage file with --portage [file]  or remove all others\n")
         sys.stderr.write(''.join([f"\t{f}\n" for f in found]))
         sys.stderr.write(f"in {d}\n")
         sys.exit(1)
@@ -99,7 +99,7 @@ def stage3_from_dir(d, filename=None):
 def generatecfg(args, config="gentoo.cfg"):
     path = args.download_dir
     cfgpath = os.path.join(path, config)
-    cfg = copy.deepcopy(gencloud.config.CLOUD_CFG)  # Use defaults only
+    cfg = copy.deepcopy(gentooimgr.config.CLOUD_CFG)  # Use defaults only
     if os.path.exists(cfgpath):
         try:
             with open(cfgpath, 'r') as f:
@@ -116,9 +116,9 @@ def load_config(args):
         cfg.update(cfgoverride)
 
     if cfg.get("portage") is None:
-        cfg['portage'] = portage_from_dir(args.download_dir, filename=cfg.get("portage"))
+        cfg['portage'] = portage_from_dir(args.download_dir, filename=args.portage or cfg.get("portage"))
     if cfg.get("stage3") is None:
-        cfg['stage3'] = stage3_from_dir(args.download_dir, filename=cfg.get("stage3"))
+        cfg['stage3'] = stage3_from_dir(args.download_dir, filename=args.stage3 or cfg.get("stage3"))
 
     return cfg
 

@@ -1,20 +1,27 @@
 """Qemu commands to run and handle the image"""
 import os
+import sys
 from subprocess import Popen, PIPE
-import gencloud.config as config
+import gentooimgr.config
 
-def create_image(image: str = "gentoo.img", fmt: str = "qcow2", size: str = "10G") -> str:
+def create_image(image: str = "gentoo.img", fmt: str = "qcow2", size: str = gentooimgr.config.QEMU_IMG_SIZE,
+                 overwrite: bool = False) -> str:
     """Creates an image (.img) file using qemu that will be used to create the cloud image
 
     :Parameters:
         - image: desired name for the cloud image file
         - fmt: format, defaults to qcow2
         - size: string with a size suffixed with size denomination, usually G for gigabyte
+        - overwrite: if True, run_image() will call this and re-create.
 
 
     :Returns:
         Full path to image file produced by qemu
     """
+    fname, ext = os.path.splitext(image)
+    image = fname + f".{fmt}"  # Replace extension with our format so we know what we're getting
+    if os.path.exists(image) and not overwrite:
+        return os.path.abspath(image)
 
     proc = Popen(['qemu-img', 'create', '-f', fmt, image, size],
                  stderr=PIPE, stdout=PIPE)
@@ -22,28 +29,31 @@ def create_image(image: str = "gentoo.img", fmt: str = "qcow2", size: str = "10G
     return os.path.abspath(image)
 
 def run_image(
-    gentoolivecd: str,
-    image: str = "gentoo.img",
-    memory: int = config.QEMU_MEMORY,
-    threads: int = config.THREADS,
-    mount_isos: list = []):
+    args,
+    mounts=[],  # Additional mounts besides what's passed into args
+    memory: int = gentooimgr.config.QEMU_MEMORY,
+    threads: int = gentooimgr.config.THREADS):
     """Handle mounts and run the live cd image
 
         - mount_isos: list of iso paths to mount in qemu as disks.
     """
-
-    mounts = []
-    for iso in mount_isos:
-        mounts.append("-drive")
-        mounts.append(f"file={iso},media=cdrom")
+    print(args)
+    qmounts = []
+    print(mounts, args.mounts)
+    mounts.extend(args.mounts)
+    print(mounts)
+    for iso in mounts:
+        print(iso)
+        qmounts.append("-drive")
+        qmounts.append(f"file={iso},media=cdrom")
 
     cmd = [
         "qemu-system-x86_64",
         "-enable-kvm",
         "-m", str(memory),
-        "-smp", str(threads),
-        "-drive", f"file={image},if=virtio,index=0",
-        "-cdrom", gentoolivecd,
+        "-smp", str(args.threads),
+        "-drive", f"file={args.image},if=virtio,index=0",
+        #"-cdrom", gentoolivecd,
         "-net", "nic,model=virtio",
         "-net", "user",
         "-vga", "virtio",
@@ -52,7 +62,9 @@ def run_image(
         "-device", "isa-serial,chardev=charserial0,id=serial0",
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
-    ] + mounts
+    ]
+    cmd.extend(qmounts)
+    print(cmd)
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     proc.communicate()
 

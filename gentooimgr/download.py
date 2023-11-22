@@ -14,8 +14,8 @@ import hashlib
 import progressbar
 from urllib.request import urlretrieve
 import tempfile
-import gencloud.config as config
-from gencloud.common import older_than_a_day
+import gentooimgr.config as config
+from gentooimgr.common import older_than_a_day
 
 hashpattern =    re.compile(config.GENTOO_FILE_HASH_RE, re.MULTILINE)
 isopattern =     re.compile(config.GENTOO_FILE_ISO_RE, re.MULTILINE)

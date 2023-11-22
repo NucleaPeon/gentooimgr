@@ -3,6 +3,7 @@ import multiprocessing
 # A day in seconds:
 DAY_IN_SECONDS = 60*60*24
 
+QEMU_IMG_SIZE = "12G"
 # Define memory (in Mb)
 QEMU_MEMORY = 4096
 # Define threads to compile packages with
@@ -120,6 +121,9 @@ ADDITIONAL_PACKAGES = [
     # app-editors/vim
 ]
 
+# TODO: Merge this into configuration
+# [ ] Use this file as a template to generate a conf file, esp. when one is not specified.
+# [ ] Use that configuration file to retrieve values or have user specify another modified one.
 CLOUD_CFG = {
     "portage": None,  # use first portage-*.tar.bz2
     "stage3": None,  # use first stage3-.tar.xz file
