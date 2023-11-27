@@ -4,9 +4,7 @@ import gentooimgr.qemu
 import gentooimgr.common
 
 def run(args):
-    print("MAIN RUN")
     mounts = args.mounts
-    iso = args.iso
     # Specified image or look for gentoo.{img,qcow2}
     image = args.image or gentooimgr.qemu.create_image()
     # We need to package up our gentooimgr package into an iso and mount it to the running image
@@ -17,18 +15,11 @@ def run(args):
         os.path.abspath(os.path.dirname(__file__)),
         ".."
     ))
-    live_iso = gentooimgr.common.find_iso(
-        os.path.join(
-            os.path.abspath(os.path.dirname(__file__)),
-            ".."
-        )
-    )
 
-    m = live_iso
-    m.append(main_iso)
-
+    print("Before run_image")
     gentooimgr.qemu.run_image(
         args,
+        iso=args.iso,
         # Add our generated mount and livecd (assumed)
-        mounts=m
+        mounts=[main_iso]
     )

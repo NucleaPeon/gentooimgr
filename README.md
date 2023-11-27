@@ -3,6 +3,14 @@ GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
 
 GentooImgr is a python script system to build cloud images based on Gentoo Linux.
 
+
+** LEFT OFF **:
+---------------
+
+* [ ] Check to see if kernel module updates kernel so it builds with basic virtio components, then regen kernel
+      and see if it boots
+
+
 **Features:**
 
 * This project enables easy access to building ``systemd`` or ``openrc`` -based images.

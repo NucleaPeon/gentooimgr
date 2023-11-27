@@ -30,6 +30,7 @@ def create_image(image: str = "gentoo.img", fmt: str = "qcow2", size: str = gent
 
 def run_image(
     args,
+    iso=None,
     mounts=[],  # Additional mounts besides what's passed into args
     memory: int = gentooimgr.config.QEMU_MEMORY,
     threads: int = gentooimgr.config.THREADS):
@@ -37,34 +38,40 @@ def run_image(
 
         - mount_isos: list of iso paths to mount in qemu as disks.
     """
-    print(args)
+    if iso is None:
+        iso = gentooimgr.common.find_iso(
+            os.path.join(
+                os.path.abspath(os.path.dirname(__file__)),
+                ".."
+            )
+        )
+        if iso:
+            iso = iso[0]  # this returns a list
     qmounts = []
-    print(mounts, args.mounts)
     mounts.extend(args.mounts)
-    print(mounts)
-    for iso in mounts:
-        print(iso)
+    for i in mounts:
         qmounts.append("-drive")
-        qmounts.append(f"file={iso},media=cdrom")
+        qmounts.append(f"file={i},media=cdrom")
 
     cmd = [
         "qemu-system-x86_64",
         "-enable-kvm",
+        "-boot", "d",
         "-m", str(memory),
         "-smp", str(args.threads),
         "-drive", f"file={args.image},if=virtio,index=0",
-        #"-cdrom", gentoolivecd,
+        "-cdrom", iso,
         "-net", "nic,model=virtio",
         "-net", "user",
         "-vga", "virtio",
         "-cpu", "kvm64",
-        "-chardev", "file,id=charserial0,path=gentoo.img.log",
+        "-chardev", "file,id=charserial0,path=gentoo.log",
         "-device", "isa-serial,chardev=charserial0,id=serial0",
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
+    print(' '.join(cmd))
     cmd.extend(qmounts)
-    print(cmd)
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     proc.communicate()
 

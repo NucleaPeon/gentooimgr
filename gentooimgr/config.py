@@ -19,7 +19,7 @@ GENTOO_LATEST_STAGE_SYSTEMD_FILE = f"latest-stage3-{ARCHITECTURE}-systemd.txt"
 GENTOO_PORTAGE_FILE = "http://distfiles.gentoo.org/snapshots/portage-latest.tar.xz"  # No architecture, no txt files to determine latest.
 
 GENTOO_MOUNT = "/mnt/gentoo"
-GENTOO_IMG_NAME = "gentoo.img"
+GENTOO_IMG_NAME = "gentoo.qcow2"
 
 GENTOO_FILE_HASH_RE = r"^Hash\: ([\w]*)$"
 GENTOO_FILE_ISO_RE = r"^(install-[\w\-_\.]*.iso) ([\d]*)"
@@ -87,7 +87,8 @@ BASE_PACKAGES = [
     "sys-block/gpart",
     "net-misc/ntp",
     "net-fs/nfs-utils",
-    "sys-block/open-iscsi"
+    "sys-block/open-iscsi",
+    "linux-firmware"
 ]
 
 ONESHOT_UPDATE_PKGS = [
@@ -106,8 +107,7 @@ EMERGE_KEEP_GOING_PKGS = [
 KERNEL_PACKAGES = [
     "sys-kernel/genkernel",
     "gentoo-sources",
-    "gentoolkit",
-    "linux-firmware"
+    "gentoolkit"
 ]
 
 BOOTLOADER_PACKAGES = [

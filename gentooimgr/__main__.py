@@ -44,6 +44,14 @@ def main(args):
         fname = gentooimgr.shrink.shrink(args.img, stamp=args.stamp)
         print(f"Shrunken image at {fname}, {os.path.getsize(fname)}")
 
+    elif args.action == "kernel":
+        import gentooimgr.kernel
+        specs = [
+            args.virtio
+        ]
+        specs = [ s for s in specs if s ]  # remove invalid values
+        gentooimgr.kernel.kernel_conf_apply(args.kernel_dir, specs)
+
 if __name__ == "__main__":
     """Gentoo Cloud Image Builder Utility"""
     parser = argparse.ArgumentParser(prog="gentooimgr", description="Gentoo Image Builder Utility")
@@ -65,6 +73,8 @@ if __name__ == "__main__":
                             help="Extract the specified portage package onto the filesystem")
     parser.add_argument("--stage3", default=None, type=pathlib.Path, nargs='?',
                             help="Extract the specified stage3 package onto the filesystem")
+    parser.add_argument("--virtio", action="store_const", const="virtio",
+                              help="Bring in virtio support")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
@@ -83,7 +93,7 @@ if __name__ == "__main__":
     parser_run = subparsers.add_parser('run', help="Run a Gentoo Image in QEMU to process it into a cloud image")
 
     parser_run.add_argument("--iso", default=None, type=pathlib.Path, nargs='?',
-                            help="Mount the specified iso in qemu")
+                            help="Mount the specified iso in qemu, should be reserved for live cd images")
     parser_run.add_argument("image", default=gentooimgr.config.GENTOO_IMG_NAME,
                             type=pathlib.Path, nargs="?",
                             help="Run the specified image in qemu")
@@ -98,8 +108,9 @@ if __name__ == "__main__":
     parser_status = subparsers.add_parser('status', help="Review information, downloaded images and configurations")
 
     parser_cloud = subparsers.add_parser("cloud-cfg", help="Configure a guest qemu VM with cloud image infrastructure")
-    parser_cloud.add_argument("--virtio", action="store_true",
-                              help="Configure kernel with virtio support for bare metal")
+    parser_cloud.add_argument("--dist-kernel", action="store_true",
+                              help="When enabled, the Gentoo dist kernel is built and all other kernel parameters are "
+                              "ignored, such as --virtio")
 
     parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
@@ -114,6 +125,12 @@ if __name__ == "__main__":
     parser_shrink.add_argument("--stamp", nargs='?', default=None,
                                help="By default a timestamp will be added to the image name, otherwise provide "
                                "a hardcoded string to add to the image name. Result: gentoo-[stamp].img")
+
+    parser_kernel = subparsers.add_parser('kernel', help="Explicitly set up just the kernel config")
+    parser_kernel.add_argument("--kernel-dir", default="/usr/src/linux",
+                               help="Where kernel is specified. By default uses the active linux kernel")
+
+
     args = parser.parse_args()
 
     isos = gentooimgr.common.find_iso(args.download_dir)
