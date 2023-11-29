@@ -23,13 +23,17 @@ def bind(mount=gentooimgr.config.GENTOO_MOUNT, verbose=True):
             sys.exit(proc.returncode)
 
 def unbind(mount=gentooimgr.config.GENTOO_MOUNT, verbose=True):
+    # Leave the chroot shell
+    proc = Popen(["exit"], stdout=PIPE, stderr=PIPE)
+    stdout, stderr = proc.communicate()
+    os.chdir("/")
+
     unmounts = [
         ["umount", "-l", os.path.join(mount, 'dev', 'shm')],
         ["umount", "-l", os.path.join(mount, 'dev', 'pts')],
         ["umount", "-l", os.path.join(mount, 'dev')],
         ["umount", "-R", mount]
     ]
-    os.chdir("/")
     for uncmd in unmounts:
         if verbose:
             print(f"\t:: {' '.join(uncmd)}")

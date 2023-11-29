@@ -22,6 +22,18 @@ GentooImgr is a python script system to build cloud images based on Gentoo Linux
 
 **rename to gentooimgr, upload to pip**
 
+Roadmap
+-------
+
+* [X] Use gentooimgr to configure and Install a Base Gentoo OS using the least amount of configuration
+
+    - Successfully built a gentoo qcow2 image that can be run in qemu, but it requires using the --dist-kernel flag
+      as building from source still requires some work.
+
+* [ ] Use gentooimgr to create a usable cloud image
+* [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64)
+
+
 Usage
 -----
 
@@ -95,6 +107,15 @@ qm set 1000 --ipconfig0 ip=dhcp
 qm set 1000 --sshkey ~/.ssh/id_rsa.pub
 qm template 1000
 ```
+
+Caveats
+--------
+
+* [X] Forced use of Rust in cloud images (cloud-init dependency)
+
+Unfortunately, using cloud-init brings in cryptography and oauthlib which pulls in rust. Any cloud images therefore are forced to use it, which is a large compilation target if rust-bin is not used. Some FOSS users, myself included, do not want rust installed on their systems and dislike how it is encroaching on so many FOSS areas.
+
+Work may be done to see if this can be avoided, but for now consider it a requirement.
 
 
 TODO

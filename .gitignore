@@ -12,5 +12,5 @@ __pycache__/
 *.sha256
 *.sha512
 *.img
-*.img.log
-*.qcow
+*.qcow2
+*.log
