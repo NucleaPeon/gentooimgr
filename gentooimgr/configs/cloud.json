@@ -1,0 +1,9 @@
+{
+    "inherit": "base.json",
+    "packages": {
+        "additional": [
+            "cloud-init",
+            "sys-block/open-iscsi"
+        ]
+    }
+}

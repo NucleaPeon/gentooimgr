@@ -1,13 +1,30 @@
 import os
 import sys
+import json
 import argparse
 import pathlib
 import gentooimgr.common
 import gentooimgr.config
+import gentooimgr.configs
+
+def determine_config(args: argparse.Namespace) -> dict:
+    """Check argparser options and return the most valid configuration
+    :Returns:
+        - configuration from json to dict
+    """
+
+    # Check custom configuration
+    configuration = gentooimgr.config.load_default_config(args.config)
+    if not configuration:
+        configuration = gentooimgr.config.load_config(args.config)
+    if not configuration:
+        sys.stderr.write("\tWW: Warning: Configuration is empty\n")
+    return configuration
 
 
 def main(args):
     '''Gentoo Cloud Image Builder Utility'''
+    configjson = determine_config(args)
 
     if args.action == "build":
         import gentooimgr.builder
@@ -15,7 +32,7 @@ def main(args):
 
     elif args.action == "run":
         import gentooimgr.run
-        gentooimgr.run.run(args)
+        gentooimgr.run.run(args, configjson)
 
     elif args.action == "test":
         import gentooimgr.test
@@ -25,11 +42,11 @@ def main(args):
 
     elif args.action == "status":
         import gentooimgr.status
-        gentooimgr.status.print_template(**vars(args))
+        gentooimgr.status.print_template(configjson, **vars(args))
 
-    elif args.action == "cloud-cfg":
-        import gentooimgr.cloud
-        gentooimgr.cloud.configure(args)
+    elif args.action == "install":
+        import gentooimgr.install
+        gentooimgr.install.configure(args)
 
     elif args.action == "command":
         import gentooimgr.command
@@ -57,6 +74,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="gentooimgr", description="Gentoo Image Builder Utility")
     parser.add_argument("-c", "--config", nargs='?', type=pathlib.Path,
                         help="Path to a custom conf file")
+    parser.add_argument("--config-cloud", action="store_const", const="cloud.json", dest="config",
+                        help="Use cloud init configuration")
+    parser.add_argument("--config-base", action="store_const", const="base.json", dest="config",
+                        help="Use a minimal base Gentoo configuration")
+
     parser.add_argument("-t", "--temporary-dir", nargs='?', type=pathlib.Path,
                         default=os.getcwd(), help="Path to temporary directory for downloading files")
     parser.add_argument("-j", "--threads", type=int, default=gentooimgr.config.THREADS,
@@ -87,9 +109,6 @@ if __name__ == "__main__":
     parser_build.add_argument("--verify", dest="verify", action="store_true", default=True,
                               help="Verify downloaded iso")
     parser_build.add_argument("--redownload", action="store_true", help="Overwrite downloaded files")
-    parser_build.add_argument("-s", "--size", default=gentooimgr.config.QEMU_IMG_SIZE,
-                              help="Size of qemu image to build. 12G is the default, suffix with 'G' for gigabyte")
-
     parser_run = subparsers.add_parser('run', help="Run a Gentoo Image in QEMU to process it into a cloud image")
 
     parser_run.add_argument("--iso", default=None, type=pathlib.Path, nargs='?',
@@ -107,10 +126,12 @@ if __name__ == "__main__":
 
     parser_status = subparsers.add_parser('status', help="Review information, downloaded images and configurations")
 
-    parser_cloud = subparsers.add_parser("cloud-cfg", help="Configure a guest qemu VM with cloud image infrastructure")
-    parser_cloud.add_argument("--dist-kernel", action="store_true",
-                              help="When enabled, the Gentoo dist kernel is built and all other kernel parameters are "
-                              "ignored, such as --virtio")
+    parser_install = subparsers.add_parser("install", help="Install Gentoo on a qemu guest. Defaults to "
+                                           "--config-base with --kernel-dist if the respective --config or --kernel options are not provided.")
+    parser_install.add_argument("--kernel-dist", action="store_true",
+                              help="Use a distribution kernel in the installation. Overrides all other kernel options.")
+    parser_install.add_argument("--kernel-virtio", action="store_true", help="Include virtio support in non-dist kernels")
+    parser_install.add_argument("--kernel-g5", action="store_true", help="Include all kernel config options for PowerMac G5 compatibility")
 
     parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,

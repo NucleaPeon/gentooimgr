@@ -1,0 +1,76 @@
+{
+    "inherit": null,
+    "imgsize": "12G",
+    "memory": 4096,
+    "mountpoint": "/mnt/gentoo",
+    "imagename": "gentoo.qcow2",
+    "licensefiles": {
+        "kernel": ["sys-kernel/linux-firmware linux-fw-redistributable"]
+    },
+    "repos": {
+        "/etc/portage/repos.conf/gentoo.conf": {
+            "sync-uri": "rsync://192.168.254.20/gentoo-portage"
+        }
+    },
+    "packages": {
+        "base": [
+            "acpid",
+            "dmidecode",
+            "syslog-ng",
+            "cronie",
+            "dhcpcd",
+            "mlocate",
+            "xfsprogs",
+            "dosfstools",
+            "sudo",
+            "postfix",
+            "app-editors/vim",
+            "parted",
+            "portage-utils",
+            "bash-completion",
+            "gentoo-bashcomp",
+            "tmux",
+            "app-misc/screen",
+            "dev-vcs/git",
+            "net-misc/curl",
+            "usbutils",
+            "pciutils",
+            "logrotate",
+            "gptfdisk",
+            "sys-block/gpart",
+            "net-misc/ntp",
+            "net-fs/nfs-utils",
+            "linux-firmware"
+        ],
+        "additional": [],
+        "oneshots": [
+            "portage"
+        ],
+        "singles": [
+            "app-portage/eix",
+            "dev-util/cmake"
+        ],
+        "keepgoing": [
+            "openssh"
+        ],
+        "bootloader": [
+            "grub:2"
+        ],
+        "kernel": [
+            "sys-kernel/genkernel",
+            "gentoo-sources",
+            "gentoolkit"
+        ]
+    },
+    "services": {
+        "syslog-ng": "default",
+        "cronie": "default",
+        "acpid": "default",
+        "ntp": "default"
+    },
+    "iso": null,
+    "portage": null,
+    "stage3": null,
+    "disk": null,
+    "partition": 1
+}

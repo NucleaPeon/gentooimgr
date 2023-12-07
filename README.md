@@ -3,12 +3,7 @@ GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
 
 GentooImgr is a python script system to build cloud images based on Gentoo Linux.
 
-
-** LEFT OFF **:
----------------
-
-* [ ] Check to see if kernel module updates kernel so it builds with basic virtio components, then regen kernel
-      and see if it boots
+Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder. 
 
 
 **Features:**
@@ -34,6 +29,16 @@ Roadmap
 * [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64)
 
 
+Prerequisites 
+-------------
+
+* [ ] QEMU
+* [ ] python3.11
+* [ ] Recommended 20GB of space
+* [ ] Internet Connection
+* [ ] virt-sparsify (for use with `gentooimgr shrink` action)
+
+
 Usage
 -----
 
@@ -49,10 +54,13 @@ Once qemu is running, mount the available gentooimgr iso and run the appropriate
 mkdir -p /mnt/gentooimgr
 mount /dev/disk/by-label/gentooimgr /mnt/gentooimgr
 cd /mnt/gentooimgr
-python -m gentooimgr cloud-cfg --virtio
+python -m gentooimgr install --config-cloud
 ```
 
-Perform any additional procedures, such as shrinking the img from 10G to ~3-4G
+Configuring the cloud image will automatically bring in virtio kernel configs so it can be run as a qemu guest, you do not have to supply ``--config-virtio``.
+
+
+Then perform any additional procedures, such as shrinking the img from 10G to ~3-4G
 
 ```sh
 python -m gentooimgr shrink gentoo.qcow2
@@ -98,14 +106,18 @@ Adding Image to Proxmox
 ```sh
 scp gentoo-[stamp].qcow2 root@proxmox:/tmp
 ssh root@proxmox
-qm create 1000 --name gentoo-templ --memory 2048 --net0 virtio,bridge=vmbr1
+# Set vmbr to your available bridge, it could be vmbr0 or vmbr1, etc.
+qm create 1000 --name gentoo-templ --memory 2048 --net0 virtio,bridge=vmbr0
 qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format qcow2
-qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/9000/vm-1000-disk-0.qcow2
+qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-disk-0.qcow2
 qm set 1000 --ide2 local:cloudinit --boot c --bootdisk scsi0 --serial0 socket --vga serial0
 qm resize 1000 scsi0 +20G
 qm set 1000 --ipconfig0 ip=dhcp
 qm set 1000 --sshkey ~/.ssh/id_rsa.pub
 qm template 1000
+
+(Creating a template from this image requires clicking the "Regenerate Image" button or equivalent cli command,
+after you set username and password)
 ```
 
 Caveats

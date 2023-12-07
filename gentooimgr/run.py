@@ -3,7 +3,7 @@ import gentooimgr.config
 import gentooimgr.qemu
 import gentooimgr.common
 
-def run(args):
+def run(args, config: dict):
     mounts = args.mounts
     # Specified image or look for gentoo.{img,qcow2}
     image = args.image or gentooimgr.qemu.create_image()
@@ -19,7 +19,7 @@ def run(args):
     print("Before run_image")
     gentooimgr.qemu.run_image(
         args,
-        iso=args.iso,
+        config,
         # Add our generated mount and livecd (assumed)
         mounts=[main_iso]
     )
