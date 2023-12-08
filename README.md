@@ -134,6 +134,7 @@ TODO
 ----
 
 * [ ] Hash check portage downloads on ``build``
+* [ ] have a way to set the iso creation to either ignore things not set in the config file, or have options to include dirs, etc.
 * [ ] --skip-update-check : Do not even attempt to download new files in any capacity, simply use the latest ones found.
         We could implement a way to find by glob and filter by modified by state and simply use the latest modified file
         each and every time so we don't fail on multiple file detections

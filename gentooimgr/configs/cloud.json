@@ -5,5 +5,7 @@
             "cloud-init",
             "sys-block/open-iscsi"
         ]
-    }
+    },
+    "disk": "/dev/vda",
+    "partition": 1
 }

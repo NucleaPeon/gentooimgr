@@ -4,8 +4,8 @@ import sys
 import argparse
 from subprocess import Popen, PIPE
 import gentooimgr.config
-
-def create_image(config: dict, overwrite: bool = False) -> str:
+import gentooimgr.common
+def create_image(args, config: dict, overwrite: bool = False) -> str:
     """Creates an image (.img) file using qemu that will be used to create the cloud image
 
     :Parameters:
@@ -17,8 +17,8 @@ def create_image(config: dict, overwrite: bool = False) -> str:
         Full path to image file produced by qemu
     """
 
-    image = config.get("imagename")
-    name, ext = os.path.splitext(config_name)
+    image = gentooimgr.common.get_image_name(args, config)
+    name, ext = os.path.splitext(image)
     if os.path.exists(image) and not overwrite:
         return os.path.abspath(image)
 
@@ -35,18 +35,21 @@ def run_image(
 
         - mount_isos: list of iso paths to mount in qemu as disks.
     """
-    iso = config.get(
-        "iso",
-        gentooimgr.common.find_iso(
+    iso = config.get("iso")
+    if iso is None:
+        iso = gentooimgr.common.find_iso(
             os.path.join(
                 os.path.abspath(os.path.dirname(__file__)),
                 ".."
             )
         )
-    )
+
+    print(iso)
     if isinstance(iso, list):
         iso = iso[0]
 
+    image = config.get("imagename", args.image) or "gentoo."+args.format
+    print(image)
     qmounts = []
     mounts.extend(args.mounts)
     for i in mounts:
@@ -60,7 +63,7 @@ def run_image(
         "-boot", "d",
         "-m", str(config.get("memory", 2048)),
         "-smp", str(threads),
-        "-drive", f"file={args.image},if=virtio,index=0",
+        "-drive", f"file={image},if=virtio,index=0",
         "-cdrom", iso,
         "-net", "nic,model=virtio",
         "-net", "user",
@@ -71,7 +74,6 @@ def run_image(
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
-    print(' '.join(cmd))
     cmd.extend(qmounts)
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     proc.communicate()

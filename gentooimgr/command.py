@@ -1,7 +1,7 @@
 import sys
 import gentooimgr.chroot
 
-def command(*args):
+def command(config, *args):
     gentooimgr.chroot.bind()
     for a in args:
         proc = Popen(a, shell=True, stdout=PIPE, stderr=PIPE)

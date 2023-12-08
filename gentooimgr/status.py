@@ -2,14 +2,14 @@ import json
 import gentooimgr.config
 import gentooimgr.configs
 
-def print_template(configjson, **kwargs):
+def print_template(args, configjson):
     print(f"""------------------------ STATUS ------------------------
 
-CPU_THREADS = {kwargs.get("threads", 1)}
-TEMPORARY_DIRECTORY = {kwargs.get("temporary_dir")}
-PROFILE = {kwargs.get("profile") or "openrc"}
+CPU_THREADS = {args.threads or 1}
+TEMPORARY_DIRECTORY = {args.temporary_dir}
+PROFILE = {args.profile}
 """)
-    print(f"CONFIG {kwargs.get('config')}")
+    print(f"CONFIG {args.config}")
     print(json.dumps(configjson, sort_keys=True, indent=4))
 
     inherit = configjson.get("inherit")
@@ -20,3 +20,9 @@ PROFILE = {kwargs.get("profile") or "openrc"}
             j = gentooimgr.config.load_config(inherit)
 
         print(json.dumps(j, sort_keys=True, indent=4))
+
+    # print(f"""------------------------ PACKAGES ------------------------""")
+    # for k, v in configjson.get("packages").items():
+    #     print(k.upper())
+    #     print("\t" + '\n\t'.join(v))
+    #     print()

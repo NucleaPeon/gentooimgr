@@ -96,29 +96,24 @@ def stage3_from_dir(d, filename=None):
 
     return found[0] if found else None
 
-def generatecfg(args, config="gentoo.cfg"):
-    path = args.download_dir
-    cfgpath = os.path.join(path, config)
-    cfg = copy.deepcopy(gentooimgr.config.CLOUD_CFG)  # Use defaults only
-    if os.path.exists(cfgpath):
-        try:
-            with open(cfgpath, 'r') as f:
-                cfg.update(json.loads(f.read()))
-        except:
-            print("\tEE: Specified config file doesn't exist or cannot be loaded as json")
 
-    return cfg
+def get_image_name(args, config):
+    image = config.get("imagename", "gentoo."+args.format)
+    if image is None:
+        image = "gentoo."+args.format
+    return image
 
-def load_config(args):
-    cfg = generatecfg(args)
-    if args.config:
-        override = generatecfg(args, config=args.config)
-        cfg.update(cfgoverride)
-
-    if cfg.get("portage") is None:
-        cfg['portage'] = portage_from_dir(args.download_dir, filename=args.portage or cfg.get("portage"))
-    if cfg.get("stage3") is None:
-        cfg['stage3'] = stage3_from_dir(args.download_dir, filename=args.stage3 or cfg.get("stage3"))
-
-    return cfg
-
+#
+# def load_config(args):
+#     cfg = generatecfg(args)
+#     if args.config:
+#         override = generatecfg(args, config=args.config)
+#         cfg.update(cfgoverride)
+#
+#     if cfg.get("portage") is None:
+#         cfg['portage'] = portage_from_dir(args.download_dir, filename=args.portage or cfg.get("portage"))
+#     if cfg.get("stage3") is None:
+#         cfg['stage3'] = stage3_from_dir(args.download_dir, filename=args.stage3 or cfg.get("stage3"))
+#
+#     return cfg
+#

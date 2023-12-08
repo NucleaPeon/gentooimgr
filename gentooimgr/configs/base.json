@@ -3,13 +3,16 @@
     "imgsize": "12G",
     "memory": 4096,
     "mountpoint": "/mnt/gentoo",
-    "imagename": "gentoo.qcow2",
+    "imagename": null,
+    "initsys": "openrc",
     "licensefiles": {
         "kernel": ["sys-kernel/linux-firmware linux-fw-redistributable"]
     },
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
-            "sync-uri": "rsync://192.168.254.20/gentoo-portage"
+            "gentoo": {
+                "sync-uri": "rsync://192.168.254.20/gentoo-portage"
+            }
         }
     },
     "packages": {
@@ -24,7 +27,6 @@
             "dosfstools",
             "sudo",
             "postfix",
-            "app-editors/vim",
             "parted",
             "portage-utils",
             "bash-completion",
@@ -42,7 +44,7 @@
             "net-fs/nfs-utils",
             "linux-firmware"
         ],
-        "additional": [],
+        "additional": ["app-editors/vim"],
         "oneshots": [
             "portage"
         ],
@@ -71,6 +73,6 @@
     "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": null,
+    "disk": "/dev/sda",
     "partition": 1
 }

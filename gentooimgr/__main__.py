@@ -3,32 +3,20 @@ import sys
 import json
 import argparse
 import pathlib
+import copy
 import gentooimgr.common
 import gentooimgr.config
 import gentooimgr.configs
 
-def determine_config(args: argparse.Namespace) -> dict:
-    """Check argparser options and return the most valid configuration
-    :Returns:
-        - configuration from json to dict
-    """
-
-    # Check custom configuration
-    configuration = gentooimgr.config.load_default_config(args.config)
-    if not configuration:
-        configuration = gentooimgr.config.load_config(args.config)
-    if not configuration:
-        sys.stderr.write("\tWW: Warning: Configuration is empty\n")
-    return configuration
-
 
 def main(args):
     '''Gentoo Cloud Image Builder Utility'''
-    configjson = determine_config(args)
+    import gentooimgr.config
+    configjson = gentooimgr.config.determine_config(args)
 
     if args.action == "build":
         import gentooimgr.builder
-        gentooimgr.builder.build(args)
+        gentooimgr.builder.build(args, configjson)
 
     elif args.action == "run":
         import gentooimgr.run
@@ -42,15 +30,15 @@ def main(args):
 
     elif args.action == "status":
         import gentooimgr.status
-        gentooimgr.status.print_template(configjson, **vars(args))
+        gentooimgr.status.print_template(args, configjson)
 
     elif args.action == "install":
         import gentooimgr.install
-        gentooimgr.install.configure(args)
+        gentooimgr.install.configure(args, configjson)
 
     elif args.action == "command":
         import gentooimgr.command
-        gentooimgr.command.command()
+        gentooimgr.command.command(configjson)
 
     elif args.action == "chroot":
         import gentooimgr.chroot
@@ -58,7 +46,7 @@ def main(args):
 
     elif args.action == "shrink":
         import gentooimgr.shrink
-        fname = gentooimgr.shrink.shrink(args.img, stamp=args.stamp)
+        fname = gentooimgr.shrink.shrink(args, config, stamp=args.stamp)
         print(f"Shrunken image at {fname}, {os.path.getsize(fname)}")
 
     elif args.action == "kernel":
@@ -91,6 +79,7 @@ if __name__ == "__main__":
                         help="Select SystemD as the Gentoo Init System")
     parser.add_argument("-f", "--force", action="store_true",
                         help="Let action occur at potential expense of data loss or errors (applies to clean and cloud-cfg)")
+    parser.add_argument("--format", default="qcow2", help="Image format to generate, default qcow2")
     parser.add_argument("--portage", default=None, type=pathlib.Path, nargs='?',
                             help="Extract the specified portage package onto the filesystem")
     parser.add_argument("--stage3", default=None, type=pathlib.Path, nargs='?',
@@ -104,7 +93,7 @@ if __name__ == "__main__":
     parser_build = subparsers.add_parser('build', help="Download and verify all the downloaded components for cloud image")
     parser_build.add_argument("image", default=gentooimgr.config.GENTOO_IMG_NAME, type=str, nargs='?',
                               help="Specify the exact image (date) you want to build; ex: 20231112T170154Z. Defaults to downloading the latest image. If image exists, will automatically use that one instead of checking online.")
-    parser_build.add_argument("--format", default="qcow2", help="Image format to generate, default qcow2")
+    parser_build.add_argument("--size", default="12G", help="Size of image to build")
     parser_build.add_argument("--no-verify", dest="verify", action="store_false", help="Do not verify downloaded iso")
     parser_build.add_argument("--verify", dest="verify", action="store_true", default=True,
                               help="Verify downloaded iso")

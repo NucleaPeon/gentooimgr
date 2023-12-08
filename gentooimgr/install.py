@@ -6,13 +6,19 @@ will continue on if an error was to occur, unless --start-over flag is given.
 
 import os
 import sys
+import shutil
+import configparser
 from subprocess import Popen, PIPE
 import gentooimgr.config
+import gentooimgr.configs
 import gentooimgr.common
 import gentooimgr.chroot
 import gentooimgr.kernel
+from gentooimgr import HERE
 
 from gentooimgr.configs import *
+
+FILES_DIR = os.path.join(HERE, "..")
 
 def step1_diskprep(args, cfg):
     print("\t:: Step 1: Disk Partitioning")
@@ -32,14 +38,20 @@ def step1_diskprep(args, cfg):
 
 def step2_mount(args, cfg):
     print(f'\t:: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}')
-    proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', gentooimgr.config.GENTOO_MOUNT])
+    proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', cfg.get("mountpoint")])
     proc.communicate()
     completestep(2, "mount")
 
 def step3_stage3(args, cfg):
     print(f'\t:: Step 3: Stage3 Tarball')
-    proc = Popen(["tar", "xpf", cfg.get("stage3"), "--xattrs-include='*.*'", "--numeric-owner", "-C",
-                  f'{gentooimgr.config.GENTOO_MOUNT}'])
+
+    stage3 = cfg.get("stage3") or args.stage3  # FIXME: auto detect stage3 images in mountpoint and add here
+    if not stage3:
+        stage3 = gentooimgr.common.stage3_from_dir(FILES_DIR)
+
+
+    proc = Popen(["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
+                  f'{cfg.get("mountpoint")}'])
     proc.communicate()
     completestep(3, "stage3")
 
@@ -50,66 +62,85 @@ def step4_binds(args, cfg):
 
 def step5_portage(args, cfg):
     print(f'\t:: Step 5: Portage')
-    proc = Popen(["tar", "xpf", args.portage or cfg.get("portage"), "-C", f"{gentooimgr.config.GENTOO_MOUNT}/usr/"])
+    portage = cfg.get("portage") or args.portage
+    if not portage:
+        portage = gentooimgr.common.portage_from_dir(FILES_DIR)
+    proc = Popen(["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"])
     proc.communicate()
     completestep(5, "portage")
 
 def step6_licenses(args, cfg):
     print(f'\t:: Step 6: Licenses')
-    license_path = os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc', 'portage', 'package.license')
+    license_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.license')
     os.makedirs(license_path, exist_ok=True)
-    for f, licenses in gentooimgr.config.GENTOO_ACCEPT_LICENSE.items():
+    for f, licenses in cfg.get("licensefiles", {}).items():
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
     completestep(6, "license")
 
 def step7_repos(args, cfg):
     print(f'\t:: Step 7: Emerge Sync Repo')
-    repo_path = os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc', 'portage', 'repos.conf')
+    repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
     os.makedirs(repo_path)
-    with open(os.path.join(repo_path, 'gentoo.conf'), 'w') as f:
-        f.write(gentooimgr.config.GENTOO_REPO_FILE)
+    # Copy from template
+    repo_file = os.path.join(repo_path, 'gentoo.conf')
+    shutil.copyfile(
+        os.path.join(cfg.get("mountpoint"), 'usr', 'share', 'portage', 'config', 'repos.conf'),
+        repo_file)
+    # Regex replace lines
+    cp = configparser.ConfigParser()
+    for repofile, data in cfg.get("repos", {}).items():
+        cp.read(repofile)
+        for section, d in data.items():
+            for key, val in d.items():
+                # Replace everything after the key with contents of value.
+                # Sed is simpler than using regex for this purpose.
+                cp.set(section, key, val)
 
     completestep(7, "repos")
 
 def step8_resolv(args, cfg):
     print(f'\t:: Step 8: Resolv')
-    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(gentooimgr.config.GENTOO_MOUNT, 'etc')])
+    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
     proc.communicate()
     # Copy all step files and python module to new chroot
-    os.system(f"cp /tmp/*.step {gentooimgr.config.GENTOO_MOUNT}/tmp")
-    os.system(f"cp -r /mnt/gi {gentooimgr.config.GENTOO_MOUNT}/mnt/")
+    os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
+    os.system(f"cp -r . {cfg.get('mountpoint')}/mnt/")
     completestep(8, "resolv")
 
 def step9_sync(args, cfg):
     print(f"\t:: Step 9: sync")
     print("\t\t:: Entering chroot")
-    os.chroot(gentooimgr.config.GENTOO_MOUNT)
+    os.chroot(cfg.get("mountpoint"))
     os.chdir(os.sep)
-
     proc = Popen(["emerge", "--sync", "--quiet"])
     proc.communicate()
     completestep(9, "sync")
 
 def step10_emerge_pkgs(args, cfg):
     print(f"\t:: Step 10: emerge pkgs")
-    for oneshot_up in gentooimgr.config.ONESHOT_UPDATE_PKGS:
+    packages = cfg.get("packages", {})
+    for oneshot_up in packages.get("oneshots", []):
         proc = Popen(["emerge", "--oneshot", "--update", oneshot_up])
         proc.communicate()
 
-    for single in gentooimgr.config.EMERGE_SINGLE_PKGS:
+    for single in packages.get("singles", []):
         proc = Popen(["emerge", single])
         proc.communicate()
 
-    for keepgoing in gentooimgr.config.EMERGE_KEEP_GOING_PKGS:
+    for keepgoing in packages.get("keepgoing", []):
         proc = Popen(["emerge", keepgoing])
         proc.communicate()
 
-    cmd = ["emerge", "-j", str(gentooimgr.config.THREADS), "--keep-going"]
-    cmd += gentooimgr.config.KERNEL_PACKAGES if not args.kernel_dist else ['sys-kernel/gentoo-kernel-bin']
-    cmd += gentooimgr.config.BASE_PACKAGES
-    cmd += gentooimgr.config.ADDITIONAL_PACKAGES
-    cmd += gentooimgr.config.BOOTLOADER_PACKAGES
+    cmd = ["emerge", "-j", str(args.threads), "--keep-going"]
+    proc = Popen(cmd)
+    proc.communicate()
+
+    cmd = ["emerge", "-j", str(args.threads)]
+    cmd.extend(packages.get("kernel", []))
+    cmd.extend(packages.get("base", []))
+    cmd.extend(packages.get("additional", []))
+    cmd.extend(packages.get("bootloader", []))
     proc = Popen(cmd)
     proc.communicate()
     completestep(10, "pkgs")
@@ -189,7 +220,7 @@ def step16_sysconfig(args, cfg):
     modloadpath = os.path.join(os.sep, 'etc', 'modules-load.d')
     os.makedirs(modloadpath)
     with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
-        f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
+        f.write('\n'.join(gentooimgr.configs.CLOUD_MODULES))
 
     cloudcfg = os.path.join(os.sep, 'etc', 'cloud')
     if not os.path.exists(cloudcfg):
@@ -248,20 +279,20 @@ def getlaststep(prefix='/tmp'):
 def stepdone(step, prefix='/tmp'):
     return os.path.exists(os.path.join(prefix, f"{step}.step"))
 
-def configure(args):
+def configure(args, config: dict):
     # Load configuration
     if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         if not args.force:
             # We aren't in a gentoo live cd are we?
             sys.stderr.write("Your system doesn't look like a gentoo live cd, exiting for safety.\n"
-                "If you want to continue, use --force option and re-run `python -m gentooimgr cloud-cfg`\n")
+                "If you want to continue, use --force option and re-run `python -m gentooimgr install` with your configuration\n")
             sys.exit(1)
 
         else:
             # Assume we are root as per live cd, otherwise user should run this as root as a secondary confirmation
             os.makedirs(gentooimgr.config.GENTOO_MOUNT)
     # disk prep
-    cfg = gentooimgr.common.load_config(args)
+    cfg = config
     if not stepdone(1): step1_diskprep(args, cfg)
     # mount root
     if not stepdone(2): step2_mount(args, cfg)
