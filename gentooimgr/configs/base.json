@@ -1,6 +1,6 @@
 {
     "inherit": null,
-    "imgsize": "12G",
+    "imgsize": "20G",
     "memory": 4096,
     "mountpoint": "/mnt/gentoo",
     "imagename": null,

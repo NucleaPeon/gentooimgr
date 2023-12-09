@@ -12,14 +12,14 @@ PROFILE = {args.profile}
     print(f"CONFIG {args.config}")
     print(json.dumps(configjson, sort_keys=True, indent=4))
 
-    inherit = configjson.get("inherit")
-    if inherit:
-        print(f"CONFIG {inherit}")
-        j = gentooimgr.config.load_default_config(inherit)
-        if not j:
-            j = gentooimgr.config.load_config(inherit)
-
-        print(json.dumps(j, sort_keys=True, indent=4))
+    # inherit = configjson.get("inherit")
+    # if inherit:
+    #     print(f"CONFIG {inherit}")
+    #     j = gentooimgr.config.load_default_config(inherit)
+    #     if not j:
+    #         j = gentooimgr.config.load_config(inherit)
+    #
+    #     print(json.dumps(j, sort_keys=True, indent=4))
 
     # print(f"""------------------------ PACKAGES ------------------------""")
     # for k, v in configjson.get("packages").items():

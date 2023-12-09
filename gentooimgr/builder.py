@@ -12,7 +12,7 @@ def build(args: argparse.Namespace, config: dict) -> None:
     stage3 = config.get("stage3") or download.download_stage3(args)
     portage = config.get("portage") or download.download_portage(args)
     filename = f"{args.image}.{args.format}"
-    image = qemu.create_image(args, config) if config.get("imagename") is None else config.get("imagename")
+    image = qemu.create_image(args, config)
     if not os.path.exists(image):
         raise Exception(f"Image {image} does not exist")
 

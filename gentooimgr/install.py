@@ -81,7 +81,7 @@ def step6_licenses(args, cfg):
 def step7_repos(args, cfg):
     print(f'\t:: Step 7: Emerge Sync Repo')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
-    os.makedirs(repo_path)
+    os.makedirs(repo_path, exist_ok=True)
     # Copy from template
     repo_file = os.path.join(repo_path, 'gentoo.conf')
     shutil.copyfile(
@@ -90,12 +90,17 @@ def step7_repos(args, cfg):
     # Regex replace lines
     cp = configparser.ConfigParser()
     for repofile, data in cfg.get("repos", {}).items():
-        cp.read(repofile)
+        cp.read(cfg.get("mountpoint") + repofile)  # repofile should be absolute path, do not use os.path.join.
         for section, d in data.items():
-            for key, val in d.items():
-                # Replace everything after the key with contents of value.
-                # Sed is simpler than using regex for this purpose.
-                cp.set(section, key, val)
+            if section in cp:
+                for key, val in d.items():
+                    # Replace everything after the key with contents of value.
+                    # Sed is simpler than using regex for this purpose.
+                    cp.set(section, key, val)
+            else:
+                sys.stderr.write(f"\tWW No section {section} in {repofile}\n")
+
+        cp.write(open(cfg.get("mountpoint") + repofile, 'w'))
 
     completestep(7, "repos")
 
@@ -128,19 +133,17 @@ def step10_emerge_pkgs(args, cfg):
         proc = Popen(["emerge", single])
         proc.communicate()
 
-    for keepgoing in packages.get("keepgoing", []):
-        proc = Popen(["emerge", keepgoing])
-        proc.communicate()
-
     cmd = ["emerge", "-j", str(args.threads), "--keep-going"]
+    cmd += packages.get("keepgoing", [])
     proc = Popen(cmd)
     proc.communicate()
 
     cmd = ["emerge", "-j", str(args.threads)]
-    cmd.extend(packages.get("kernel", []))
-    cmd.extend(packages.get("base", []))
-    cmd.extend(packages.get("additional", []))
-    cmd.extend(packages.get("bootloader", []))
+    cmd += packages.get("kernel", [])
+    cmd += packages.get("base", [])
+    cmd += packages.get("additional", [])
+    cmd += packages.get("bootloader", [])
+    print(cmd)
     proc = Popen(cmd)
     proc.communicate()
     completestep(10, "pkgs")

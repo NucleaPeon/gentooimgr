@@ -22,8 +22,8 @@ def create_image(args, config: dict, overwrite: bool = False) -> str:
     if os.path.exists(image) and not overwrite:
         return os.path.abspath(image)
 
-    proc = Popen(['qemu-img', 'create', '-f', ext, image, str(config.get("memory", 2048))],
-                 stderr=PIPE, stdout=PIPE)
+    cmd = ['qemu-img', 'create', '-f', ext[1:], image, str(config.get("memory", 2048))]
+    proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
     return os.path.abspath(image)
 
