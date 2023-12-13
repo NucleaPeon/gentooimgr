@@ -8,6 +8,9 @@
     "licensefiles": {
         "kernel": ["sys-kernel/linux-firmware linux-fw-redistributable"]
     },
+    "kernel": {
+        "path": "/etc/kernels/config.d/gentooimgr-base.config"
+    },
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
             "gentoo": {

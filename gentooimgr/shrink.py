@@ -8,7 +8,8 @@ def shrink(args, config,  stamp=None):
         # 0 padded month and day timestamp
         stamp = f"{dt.year}-{dt.month:02d}-{dt.day:02d}"
     name, ext = os.path.splitext(config.get("imagename") or args.img)
-    filename = f"{name}-{stamp}.img"
-    proc = Popen(["virt-sparsify", "--compress", img, filename])
+    # ext includes the .
+    filename = f"{name}-{stamp}{ext}"
+    proc = Popen(["virt-sparsify", "--compress", args.img, filename])
     proc.communicate()
     return filename

@@ -32,9 +32,9 @@ GENTOO_FILE_STAGE3_HASH_RE = r"^([\w]*)  (stage3-[\w\-_\.]*.tar.*)$"
 def replace_repos_conf(key, value):
     pass
 
-# CLOUD_MODULES = [
-#     "iscsi_tcp"
-# ]
+CLOUD_MODULES = [
+    "iscsi_tcp"
+]
 
 def load_config(path):
     if os.path.exists(path):

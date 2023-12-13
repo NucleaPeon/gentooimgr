@@ -2,10 +2,14 @@
     "inherit": "base.json",
     "packages": {
         "additional": [
-            "cloud-init",
+            "app-emulation/cloud-init",
             "sys-block/open-iscsi"
         ]
     },
     "disk": "/dev/vda",
+    "kernel": {
+        "path": "/etc/kernels/config.d/gentooimgr-cloud.config",
+        "config": "cloud.config"
+    },
     "partition": 1
 }

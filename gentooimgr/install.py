@@ -67,6 +67,16 @@ def step5_portage(args, cfg):
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
     proc = Popen(["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"])
     proc.communicate()
+    # Edit portage
+    portage_env = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'env')
+    os.makedirs(portage_env, exist_ok=True)
+    with open(os.path.join(portage_env, 'singlejob.conf'), 'w') as f:
+        f.write('MAKEOPTS="-j1"\n')
+
+    env_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.env')
+    with open(env_path, 'w') as f:
+        f.write("app-portage/eix singlejob.conf\ndev-util/maturin singlejob.conf\ndev-util/cmake singlejob.conf")
+
     completestep(5, "portage")
 
 def step6_licenses(args, cfg):
@@ -79,7 +89,7 @@ def step6_licenses(args, cfg):
     completestep(6, "license")
 
 def step7_repos(args, cfg):
-    print(f'\t:: Step 7: Emerge Sync Repo')
+    print(f'\t:: Step 7: Repo Configuration')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
     os.makedirs(repo_path, exist_ok=True)
     # Copy from template
@@ -118,7 +128,11 @@ def step9_sync(args, cfg):
     print("\t\t:: Entering chroot")
     os.chroot(cfg.get("mountpoint"))
     os.chdir(os.sep)
+    os.system("source /etc/profile")
     proc = Popen(["emerge", "--sync", "--quiet"])
+    proc.communicate()
+    print("\t\t:: Emerging base")
+    proc = Popen(["emerge", "--update", "--deep", "--newuse", "--keep-going", "@world"])
     proc.communicate()
     completestep(9, "sync")
 
@@ -130,7 +144,13 @@ def step10_emerge_pkgs(args, cfg):
         proc.communicate()
 
     for single in packages.get("singles", []):
-        proc = Popen(["emerge", single])
+        proc = Popen(["emerge", "-j1", single])
+        proc.communicate()
+
+    print("KERNEL PACKAGES", packages.get("kernel"))
+    if packages.get("kernel", []):
+        cmd = ["emerge", "-j", str(args.threads)] + packages.get("kernel", [])
+        proc = Popen(cmd)
         proc.communicate()
 
     cmd = ["emerge", "-j", str(args.threads), "--keep-going"]
@@ -139,7 +159,6 @@ def step10_emerge_pkgs(args, cfg):
     proc.communicate()
 
     cmd = ["emerge", "-j", str(args.threads)]
-    cmd += packages.get("kernel", [])
     cmd += packages.get("base", [])
     cmd += packages.get("additional", [])
     cmd += packages.get("bootloader", [])
@@ -154,24 +173,19 @@ def step11_kernel(args, cfg):
     proc = Popen(["eselect", "kernel", "set", "1"])
     proc.communicate()
     if not args.kernel_dist:
-        os.chdir(os.path.join(os.sep, 'usr', 'src', 'linux'))
+        os.chdir(args.kernel_dir)
         threads = str(gentooimgr.config.THREADS)
-        for cmd in [
-            ["make", "defconfig", "-j", threads],
-            ["make", "kvm_guest", "-j", threads],  # This should be toggled with --virtio option (--config-kvm?)
-            ["genkernel", "all"]]:
-            proc = Popen(cmd)
-            proc.communicate()
+        gentooimgr.kernel.build_kernel(args, cfg)
 
     completestep(11, "kernel")
 
 def step12_grub(args, cfg):
     print(f"\t:: Step 12: kernel")
-    proc = Popen(["grub-install", gentooimgr.config.CLOUD_CFG['disk']])
+    proc = Popen(["grub-install", cfg.get('disk')])
     proc.communicate()
     code = proc.returncode
     if code != 0:
-        sys.stderr.write(f"Failed to install grub on {gentooimgr.config.CLOUD_CFG['disk']}\n")
+        sys.stderr.write(f"Failed to install grub on {cfg.get('disk')}\n")
         sys.exit(code)
 
     with open("/etc/default/grub", 'w') as f:
@@ -221,14 +235,14 @@ def step16_sysconfig(args, cfg):
         f.write("vm.swappiness = 0\n")
 
     modloadpath = os.path.join(os.sep, 'etc', 'modules-load.d')
-    os.makedirs(modloadpath)
+    os.makedirs(modloadpath, exist_ok=True)
     with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
-        f.write('\n'.join(gentooimgr.configs.CLOUD_MODULES))
+        f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
 
     cloudcfg = os.path.join(os.sep, 'etc', 'cloud')
     if not os.path.exists(cloudcfg):
-        os.makedirs(cloudcfg)
-        os.makedirs(os.path.join(cloudcfg, 'templates'))
+        os.makedirs(cloudcfg, exist_ok=True)
+        os.makedirs(os.path.join(cloudcfg, 'templates'), exist_ok=True)
     with open(os.path.join(cloudcfg, 'cloud.cfg'), 'w') as cfg:
         cfg.write(f"{CLOUD_YAML}")
 
@@ -258,7 +272,7 @@ def step16_sysconfig(args, cfg):
 def step17_fstab(args, cfg):
     print(f"\t:: Step 17: fstab")
     with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
-        fstab.write(f"{gentooimgr.config.CLOUD_CFG.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
+        fstab.write(f"{cfg.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
 
     completestep(17, "fstab")
 

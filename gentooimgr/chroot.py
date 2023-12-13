@@ -23,21 +23,21 @@ def bind(mount=gentooimgr.config.GENTOO_MOUNT, verbose=True):
             sys.exit(proc.returncode)
 
 def unbind(mount=gentooimgr.config.GENTOO_MOUNT, verbose=True):
-    # Leave the chroot shell
-    proc = Popen(["exit"], stdout=PIPE, stderr=PIPE)
-    stdout, stderr = proc.communicate()
     os.chdir("/")
+    if not os.path.exists(mount):
+        sys.stderr.write(f"Mountpoint {mount} does not exist\n")
+        return
 
     unmounts = [
-        ["umount", "-l", os.path.join(mount, 'dev', 'shm')],
-        ["umount", "-l", os.path.join(mount, 'dev', 'pts')],
+        ["umount", os.path.join(mount, 'dev', 'shm')],
+        ["umount", os.path.join(mount, 'dev', 'pts')],
         ["umount", "-l", os.path.join(mount, 'dev')],
         ["umount", "-R", mount]
     ]
     for uncmd in unmounts:
         if verbose:
             print(f"\t:: {' '.join(uncmd)}")
-        proc = Popen(uncmd, stdout=PIPE, stderr=PIPE)
+        proc = Popen(uncmd)
         stdout, stderr = proc.communicate()
         if proc.returncode != 0:
             sys.stderr.write(f"{stderr}\n")
@@ -48,5 +48,7 @@ def chroot(path=gentooimgr.config.GENTOO_MOUNT, shell="/bin/bash"):
     os.chroot(path)
     os.chdir(os.sep)
     os.system(shell)
-    unbind(mount=path)
+    unchroot(path=path)  # May fail if we do this automatically
 
+def unchroot(path=gentooimgr.config.GENTOO_MOUNT):
+    unbind(mount=path)

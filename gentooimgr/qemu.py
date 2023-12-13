@@ -22,7 +22,7 @@ def create_image(args, config: dict, overwrite: bool = False) -> str:
     if os.path.exists(image) and not overwrite:
         return os.path.abspath(image)
 
-    cmd = ['qemu-img', 'create', '-f', ext[1:], image, str(config.get("memory", 2048))]
+    cmd = ['qemu-img', 'create', '-f', ext[1:], image, str(config.get("imgsize", "12G"))]
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
     return os.path.abspath(image)
@@ -44,12 +44,11 @@ def run_image(
             )
         )
 
-    print(iso)
     if isinstance(iso, list):
         iso = iso[0]
 
-    image = config.get("imagename", args.image) or "gentoo."+args.format
-    print(image)
+
+    image = gentooimgr.common.get_image_name(args, config)
     qmounts = []
     mounts.extend(args.mounts)
     for i in mounts:
@@ -74,7 +73,12 @@ def run_image(
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
-    cmd.extend(qmounts)
+    cmd += qmounts
+    print(cmd)
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
-    proc.communicate()
+    stdout, stderr = proc.communicate()
+    if stderr:
+        sys.stderr.write(str(stderr))
+        sys.stderr.write("\n")
+
 

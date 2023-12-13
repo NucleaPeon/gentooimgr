@@ -44,18 +44,18 @@ def main(args):
         import gentooimgr.chroot
         gentooimgr.chroot.chroot(path=args.mountpoint, shell="/bin/bash")
 
+    elif args.action == "unchroot":
+        import gentooimgr.chroot
+        gentooimgr.chroot.unchroot(path=args.mountpoint)
+
     elif args.action == "shrink":
         import gentooimgr.shrink
-        fname = gentooimgr.shrink.shrink(args, config, stamp=args.stamp)
+        fname = gentooimgr.shrink.shrink(args, configjson, stamp=args.stamp)
         print(f"Shrunken image at {fname}, {os.path.getsize(fname)}")
 
     elif args.action == "kernel":
         import gentooimgr.kernel
-        specs = [
-            args.virtio
-        ]
-        specs = [ s for s in specs if s ]  # remove invalid values
-        gentooimgr.kernel.kernel_conf_apply(args.kernel_dir, specs)
+        gentooimgr.kernel.build_kernel(args, configjson)
 
 if __name__ == "__main__":
     """Gentoo Cloud Image Builder Utility"""
@@ -84,8 +84,6 @@ if __name__ == "__main__":
                             help="Extract the specified portage package onto the filesystem")
     parser.add_argument("--stage3", default=None, type=pathlib.Path, nargs='?',
                             help="Extract the specified stage3 package onto the filesystem")
-    parser.add_argument("--virtio", action="store_const", const="virtio",
-                              help="Bring in virtio support")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
@@ -124,6 +122,10 @@ if __name__ == "__main__":
 
     parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
+                               help="Point to mount and run the chroot and shell")
+
+    parser_unchroot = subparsers.add_parser("unchroot", help="Unmounts chroot filesystems")
+    parser_unchroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
                                help="Point to mount and run the chroot and shell")
 
     parser_cmd = subparsers.add_parser('command', help="Handle bind mounts and run command(s) in guest chroot, then unmount binds")

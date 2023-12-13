@@ -17,9 +17,12 @@ def run(args, config: dict):
         ".."
     ))
 
+    print(args)
+    print(main_iso)
     gentooimgr.qemu.run_image(
         args,
         config,
         # Add our generated mount and livecd (assumed)
         mounts=[main_iso]
     )
+    print("done")

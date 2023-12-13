@@ -6,78 +6,42 @@ import datetime
 from subprocess import Popen, PIPE
 import time
 
-VIRTIO_CONF = """
-CONFIG_BLOCK=y
-CONFIG_BLK_DEV=y
-CONFIG_DEVTMPFS=y
-CONFIG_VIRTIO_MENU=y
-CONFIG_VIRTIO_BLK=y
-"""
+import gentooimgr.configs
 
-SPEC = dict(
-    virtio=VIRTIO_CONF
-)
+DEFAULT_KERNEL_CONFIG_PATH = os.path.join(os.sep, 'etc', 'kernel', 'default.config')
 
-def kernel_confs(specs=[]):
-    """Returns a list of config options (CONFIG_OPT=y/n/m) required for the spec(s) given
+def kernel_conf_apply(args, config):
+    """Kernel configuration is a direct copy of a full complete config file"""
+    fname, ext = os.path.splitext(args.config)
+    # Default is the json file's name but with .config extension.
+    kernelconfig = os.path.join(gentooimgr.configs.CONFIG_DIR,
+                                config.get("kernel", {}).get("config", f"{fname}.config"))
+    kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
+    if os.path.exists(kernelpath):
+        os.remove(kernelpath)
+    else:
+        # Ensure if we have directories specified that they exist
+        os.makedirs(os.path.dirname(kernelpath), exist_ok=True)
 
-    If --virtio is given, the kernel is configured to boot in a qemu environment. You would
-    see the following config options set for the hard drive:
+    shutil.copyfile(kernelconfig, kernelpath)
 
-        CONFIG_BLOCK=y
-        CONFIG_BLK_DEV=y
-        CONFIG_DEVTMPFS=y
-        CONFIG_VIRTIO_MENU=y
-        CONFIG_VIRTIO_BLK=y
-    """
+def build_kernel(args, config):
+    if config.get("kernel", {}).get("config") is None:
+        kernel_default_config(args, config)
+    os.chdir(args.kernel_dir)
+    kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
+    kernel_conf_apply(args, config)
+    proc = Popen(['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--no-menuconfig', 'all'])
+    proc.communicate()
+    kernel_save_config(args, config)
 
-    retval = []
-    for s in specs:
-        retval.extend(SPEC.get(s, "").split("\n"))
+def kernel_default_config(args, config):
+    os.chdir(args.kernel_dir)
+    proc = Popen(["make", "defconfig"])
+    proc.communicate()
 
-    return [ rv for rv in retval if rv ]
-
-def kernel_conf_apply(kernel_dir='/usr/src/linux',
-                      spectypes=[]):
-    """Applies the given spec list (one CONFIG_ per line)
-        - Performs a check; if an exact match up to the = isn't found, add it.
-        - If an exact key match is found, check if it's exact. If not, run sed to change the value.
-        - Write out a temporary kernel config file before doing a backup and write (use unix timestamp for backups.)
-    """
-    if not spectypes:
-        sys.stderr.write("")
-        return
-
-    configs = kernel_confs(specs=spectypes)
-
-    written_specs = []
-    tmpfile = "/tmp/.config.tmp"
-    if os.path.exists(tmpfile):
-        os.remove(tmpfile)
-    kernelconfig = os.path.join(kernel_dir, '.config')
-    timestamp = time.mktime(datetime.datetime.now().timetuple())
-    shutil.copy(kernelconfig, kernelconfig+str(timestamp))
-
-    with open(tmpfile, 'w') as newconf:
-        with open(kernelconfig, 'r') as conf:
-            configtext = conf.read()
-            # One possible caveat is that all specified configs end up at the top of the file.
-            for c in configs:
-                spec, val = c.split("=")
-                newconf.write(f"{spec}={val}\n")
-                written_specs.append(f"{spec}=")  # without value, but include equals
-
-            for c in configtext.split("\n"):
-                # If the conf we are about to write matches the new one spec'd and written, skip it
-                if list(filter(lambda x: c.startswith(x), written_specs)):
-                    continue  # Already exists
-
-                newconf.write(f"{c}\n")
-
-    shutil.copy(tmpfile, kernelconfig)
-    os.remove(tmpfile)
-
-def kernel_save_config():
+def kernel_save_config(args, config):
+    os.chdir(args.kernel_dir)
     """Saves the current .config file"""
     proc = Popen(["make", "savedefconfig"])
     proc.communicate()

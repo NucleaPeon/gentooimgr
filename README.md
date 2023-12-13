@@ -54,11 +54,10 @@ Once qemu is running, mount the available gentooimgr iso and run the appropriate
 mkdir -p /mnt/gentooimgr
 mount /dev/disk/by-label/gentooimgr /mnt/gentooimgr
 cd /mnt/gentooimgr
-python -m gentooimgr install --config-cloud
+python -m gentooimgr --config-cloud install
 ```
 
-Configuring the cloud image will automatically bring in virtio kernel configs so it can be run as a qemu guest, you do not have to supply ``--config-virtio``.
-
+Configuring the cloud image will automatically bring in appropriate kernel configs (these are defined in ``gentooimgr/configs/cloud.config``).
 
 Then perform any additional procedures, such as shrinking the img from 10G to ~3-4G
 
@@ -89,13 +88,14 @@ There are also commands that allow you to quickly enter the livecd chroot or run
 python -m gentooimgr chroot
 ```
 
-Mounts/binds are handled automatically when you exit the chroot.
+Mounts/binds are handled automatically when you chroot, but you will need to ``unchroot`` after to unmount the file systems:
 
 ```sh
-python -m gentooimgr command "ls /mnt/gentoo"
+python -m gentooimgr chroot
+ls /usr/src/linux
+exit
+python -m gentooimgr unchroot
 ```
-
-The above will fail because the command is run in the chroot which doesn't have an ``/mnt/gentoo`` directory in it. Multiple commands can be given, simply list each one in quotes: ``python -m gentooimgr command "/bin/cmd 1" "/bin/cmd 2" "/bin/cmd 3 foo bar"``.
 
 
 Adding Image to Proxmox
