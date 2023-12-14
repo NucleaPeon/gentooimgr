@@ -3,7 +3,7 @@ GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
 
 GentooImgr is a python script system to build cloud images based on Gentoo Linux.
 
-Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder. 
+Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for providing a foundation to work from.
 
 
 **Features:**
@@ -17,6 +17,17 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder.
 
 **rename to gentooimgr, upload to pip**
 
+Preface
+-------
+
+This project was created so I could spawn off Gentoo OS templates on my Proxmox server for various services while being more efficient than many other Linux OS's and avoiding systemd.
+
+This python module contains all the software needed to download resources, build the image, run the image in qemu, and allow for some extensibility. The built-in functionality includes a base standard gentoo image configuration as well as a cloud-init image that can be run. You can copy the .json config file and optionally a kernel .config file to configure your image to your liking and pass it in with ``--config``.
+
+This software is in beta so please report any issues or feature requests. You are **highly** encouraged to do so.
+
+Thanks!
+
 Roadmap
 -------
 
@@ -25,7 +36,7 @@ Roadmap
     - Successfully built a gentoo qcow2 image that can be run in qemu, but it requires using the --dist-kernel flag
       as building from source still requires some work.
 
-* [ ] Use gentooimgr to create a usable cloud image
+* [X] Use gentooimgr to create a usable cloud image (requires --dist-kernel currently)
 * [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64)
 
 
@@ -45,19 +56,15 @@ Usage
 ```sh
 git clone https://github.com/NucleaPeon/gentooimgr.git
 python -m gentooimgr build
-# python -m gentooimgr --config-_____ build
 python -m gentooimgr run
-# a basic run will build a default gentoo amd64 system. Use --kernel-dist to get a distribution kernel
-# python -m gentooimgr --config-_____ run
-# python -m gentooimgr --config-cloud run
 ```
 
 Once qemu is running, mount the available gentooimgr iso and run the appropriate command:
 
 ```sh
-mkdir -p /mnt/gentooimgr
-mount /dev/disk/by-label/gentooimgr /mnt/gentooimgr
-cd /mnt/gentooimgr
+mkdir -p /mnt/gi
+mount /dev/disk/by-label/gentooimgr /mnt/gi
+cd /mnt/gi
 python -m gentooimgr --config-cloud install
 ```
 
@@ -69,13 +76,16 @@ Then perform any additional procedures, such as shrinking the img from 10G to ~3
 python -m gentooimgr shrink gentoo.qcow2
 ```
 
+**NOTE** Due to how ``gentooimgr`` dynamically finds the most recent portage/stage3 and iso files, if multiples exist in the same directory you may have to specify them using the appropriate flag (ie: ``--iso [path-to-iso]``). Older images can be used in this manner and eventually setting those values in the .json file should be recognized by gentooimgr so there will be no need to specify them on the command line.
+
+
 
 Extended Usage
 --------------
 
 GentooImgr is flexible in that it can be run on a live running system as well as on a livecd in qemu;
 
-It's possible to automate a new bare-metal Gentoo installation (with some further development) simply by running ``cloud-cfg`` or equivalent command to install and set up everything.
+It's possible to automate a new bare-metal Gentoo installation (with some further development) simply by running the ``install`` action or equivalent command to install and set up everything.
 
 Eventually, GentooImgr will be used to build gentoo turnkey OS images automatically.
 
@@ -96,7 +106,7 @@ Mounts/binds are handled automatically when you chroot, but you will need to ``u
 
 ```sh
 python -m gentooimgr chroot
-ls /usr/src/linux
+# do stuff
 exit
 python -m gentooimgr unchroot
 ```
