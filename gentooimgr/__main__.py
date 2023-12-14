@@ -84,6 +84,8 @@ if __name__ == "__main__":
                             help="Extract the specified portage package onto the filesystem")
     parser.add_argument("--stage3", default=None, type=pathlib.Path, nargs='?',
                             help="Extract the specified stage3 package onto the filesystem")
+    parser.add_argument("--kernel-dir", default="/usr/src/linux",
+                               help="Where kernel is specified. By default uses the active linux kernel")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
@@ -138,9 +140,7 @@ if __name__ == "__main__":
                                help="By default a timestamp will be added to the image name, otherwise provide "
                                "a hardcoded string to add to the image name. Result: gentoo-[stamp].img")
 
-    parser_kernel = subparsers.add_parser('kernel', help="Explicitly set up just the kernel config")
-    parser_kernel.add_argument("--kernel-dir", default="/usr/src/linux",
-                               help="Where kernel is specified. By default uses the active linux kernel")
+    parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag")
 
 
     args = parser.parse_args()

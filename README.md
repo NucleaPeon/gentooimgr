@@ -45,7 +45,11 @@ Usage
 ```sh
 git clone https://github.com/NucleaPeon/gentooimgr.git
 python -m gentooimgr build
+# python -m gentooimgr --config-_____ build
 python -m gentooimgr run
+# a basic run will build a default gentoo amd64 system. Use --kernel-dist to get a distribution kernel
+# python -m gentooimgr --config-_____ run
+# python -m gentooimgr --config-cloud run
 ```
 
 Once qemu is running, mount the available gentooimgr iso and run the appropriate command:
