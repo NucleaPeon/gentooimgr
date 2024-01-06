@@ -14,14 +14,17 @@ import gentooimgr.configs
 import gentooimgr.common
 import gentooimgr.chroot
 import gentooimgr.kernel
+import gentooimgr.errorcodes
 from gentooimgr import HERE
+from gentooimgr.logging import LOG
 
 from gentooimgr.configs import *
 
 FILES_DIR = os.path.join(HERE, "..")
+LAST_STEP = 17
 
 def step1_diskprep(args, cfg):
-    print("\t:: Step 1: Disk Partitioning")
+    LOG.info(":: Step 1: Disk Preparation")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = [
@@ -30,66 +33,78 @@ def step1_diskprep(args, cfg):
             ['partprobe'],
             ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{cfg.get("partition", 1)}']
     ]
+
     for c in cmds:
+        LOG.debug(' '.join(c))
         proc = Popen(c, stdout=PIPE, stderr=PIPE)
         stdout, stderr = proc.communicate()
 
     completestep(1, "diskprep")
 
 def step2_mount(args, cfg):
-    print(f'\t:: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}')
-    proc = Popen(["mount", f'{cfg.get("disk")}{cfg.get("partition")}', cfg.get("mountpoint")])
+    LOG.info(f":: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}")
+    cmd = ["mount", f'{cfg.get("disk")}{cfg.get("partition")}', cfg.get("mountpoint")]
+    LOG.debug(' '.join(cmd))
+    proc = Popen(cmd)
     proc.communicate()
     completestep(2, "mount")
 
 def step3_stage3(args, cfg):
-    print(f'\t:: Step 3: Stage3 Tarball')
-
+    LOG.info(f":: Step 3: Stage3 Tarball")
     stage3 = cfg.get("stage3") or args.stage3  # FIXME: auto detect stage3 images in mountpoint and add here
     if not stage3:
         stage3 = gentooimgr.common.stage3_from_dir(FILES_DIR)
 
-
-    proc = Popen(["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
-                  f'{cfg.get("mountpoint")}'])
+    LOG.info(f"\t:: Stage 3 file selected: {stage3}")
+    cmd = ["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
+                  f'{cfg.get("mountpoint")}']
+    LOG.debug(' '.join(cmd))
+    proc = Popen(cmd)
     proc.communicate()
     completestep(3, "stage3")
 
 def step4_binds(args, cfg):
-    print(f'\t:: Step 4: Binding Filesystems')
-    gentooimgr.chroot.bind(verbose=False)
+    LOG.info(':: Step 4: Binding Filesystems')
+    gentooimgr.chroot.bind(verbose=args.debug)
     completestep(4, "binds")
 
 def step5_portage(args, cfg):
-    print(f'\t:: Step 5: Portage')
+    LOG.info(':: Step 5: Portage')
     portage = cfg.get("portage") or args.portage
     if not portage:
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
-    proc = Popen(["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"])
+
+    LOG.info(f"\t:: Portage file selected: {portage}")
+    cmd = ["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"]
+    LOG.debug(" ".join(cmd))
+    proc = Popen(cmd)
     proc.communicate()
     # Edit portage
     portage_env = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'env')
     os.makedirs(portage_env, exist_ok=True)
     with open(os.path.join(portage_env, 'singlejob.conf'), 'w') as f:
         f.write('MAKEOPTS="-j1"\n')
+    LOG.info("\t:: Portage single job configuration file written")
 
     env_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.env')
     with open(env_path, 'w') as f:
         f.write("app-portage/eix singlejob.conf\ndev-util/maturin singlejob.conf\ndev-util/cmake singlejob.conf")
+    LOG.info("\t:: Portage package environment configuration file written")
 
     completestep(5, "portage")
 
 def step6_licenses(args, cfg):
-    print(f'\t:: Step 6: Licenses')
+    LOG.info(':: Step 6: Licenses')
     license_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.license')
     os.makedirs(license_path, exist_ok=True)
     for f, licenses in cfg.get("licensefiles", {}).items():
+        LOG.info(f"\t:: Writing {f} license file")
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
     completestep(6, "license")
 
 def step7_repos(args, cfg):
-    print(f'\t:: Step 7: Repo Configuration')
+    LOG.info(':: Step 7: Repo Configuration')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
     os.makedirs(repo_path, exist_ok=True)
     # Copy from template
@@ -97,6 +112,7 @@ def step7_repos(args, cfg):
     shutil.copyfile(
         os.path.join(cfg.get("mountpoint"), 'usr', 'share', 'portage', 'config', 'repos.conf'),
         repo_file)
+    LOG.info(f"\t:: Repo configuration file copied {repo_file}")
     # Regex replace lines
     cp = configparser.ConfigParser()
     for repofile, data in cfg.get("repos", {}).items():
@@ -108,14 +124,14 @@ def step7_repos(args, cfg):
                     # Sed is simpler than using regex for this purpose.
                     cp.set(section, key, val)
             else:
-                sys.stderr.write(f"\tWW No section {section} in {repofile}\n")
+                LOG.warning(f"\tWW No section {section} in {repofile}\n")
 
         cp.write(open(cfg.get("mountpoint") + repofile, 'w'))
 
     completestep(7, "repos")
 
 def step8_resolv(args, cfg):
-    print(f'\t:: Step 8: Resolv')
+    LOG.info(f':: Step 8: Resolv')
     proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
     proc.communicate()
     # Copy all step files and python module to new chroot
@@ -124,20 +140,20 @@ def step8_resolv(args, cfg):
     completestep(8, "resolv")
 
 def step9_sync(args, cfg):
-    print(f"\t:: Step 9: sync")
-    print("\t\t:: Entering chroot")
-    os.chroot(cfg.get("mountpoint"))
+    LOG.info(f":: Step 9: sync")
     os.chdir(os.sep)
     os.system("source /etc/profile")
     proc = Popen(["emerge", "--sync", "--quiet"])
     proc.communicate()
-    print("\t\t:: Emerging base")
+    LOG.debug("\t:: Sync'd")
+    LOG.info("\t:: Emerging base")
     proc = Popen(["emerge", "--update", "--deep", "--newuse", "--keep-going", "@world"])
     proc.communicate()
+    LOG.debug("\t:: World Emerged")
     completestep(9, "sync")
 
 def step10_emerge_pkgs(args, cfg):
-    print(f"\t:: Step 10: emerge pkgs")
+    LOG.info(f":: Step 10: emerge pkgs")
     packages = cfg.get("packages", {})
     for oneshot_up in packages.get("oneshots", []):
         proc = Popen(["emerge", "--oneshot", "--update", oneshot_up])
@@ -147,7 +163,7 @@ def step10_emerge_pkgs(args, cfg):
         proc = Popen(["emerge", "-j1", single])
         proc.communicate()
 
-    print("KERNEL PACKAGES", packages.get("kernel"))
+    LOG.debug("KERNEL PACKAGES", packages.get("kernel"))
     if packages.get("kernel", []):
         cmd = ["emerge", "-j", str(args.threads)] + packages.get("kernel", [])
         proc = Popen(cmd)
@@ -162,14 +178,23 @@ def step10_emerge_pkgs(args, cfg):
     cmd += packages.get("base", [])
     cmd += packages.get("additional", [])
     cmd += packages.get("bootloader", [])
-    print(cmd)
+    cmd += args.packages or []
+    LOG.info(f"\t:: Emerging package list command {cmd}")
     proc = Popen(cmd)
     proc.communicate()
+    try:
+        proc = Popen(["eix-update"])
+        proc.communicate()
+        LOG.debug("\t:: eix Updated")
+    except Exception as E:
+        # eix is assumed to be installed based on our base.json package, but custom configs may not have it.
+        # That means this is non-essential to occur.
+        LOG.warning("eix-update failed to run, is eix installed?")
     completestep(10, "pkgs")
 
 def step11_kernel(args, cfg):
     # at this point, genkernel will be installed
-    print(f"\t:: Step 11: kernel")
+    LOG.info(f":: Step 11: kernel")
     proc = Popen(["eselect", "kernel", "set", "1"])
     proc.communicate()
     if not args.kernel_dist:
@@ -180,7 +205,7 @@ def step11_kernel(args, cfg):
     completestep(11, "kernel")
 
 def step12_grub(args, cfg):
-    print(f"\t:: Step 12: kernel")
+    LOG.info(f":: Step 12: kernel")
     proc = Popen(["grub-install", cfg.get('disk')])
     proc.communicate()
     code = proc.returncode
@@ -196,15 +221,16 @@ def step12_grub(args, cfg):
     completestep(12, "grub")
 
 def step13_serial(args, cfg):
-    print(f"\t:: Step 13: Serial")
+    LOG.info(f":: Step 13: Serial")
     os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
     os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
     completestep(13, "serial")
 
 def step14_services(args, cfg):
-    print(f"\t:: Step 14: Services")
-    for service in ["acpid", "syslog-ng", "cronie", "sshd", "cloud-init-local", "cloud-init", "cloud-config",
-                    "cloud-final", "ntpd", "nfsclient"]:
+    LOG.info(f":: Step 14: Services")
+    services = args.services or []
+    services += cfg.get("services", [])
+    for service in services:
         if args.profile == "systemd":
             proc = Popen(["systemctl", "enable", service])
         else:
@@ -214,11 +240,11 @@ def step14_services(args, cfg):
     completestep(14, "services")
 
 def step15_ethnaming(args, cfg):
-    print(f"\t:: Step 15: Eth Naming")
+    LOG.info(f":: Step 15: Eth Naming")
     completestep(15, "networking")
 
 def step16_sysconfig(args, cfg):
-    print(f"\t:: Step 16: Sysconfig")
+    LOG.info(f":: Step 16: Sysconfig")
     with open("/etc/timezone", "w") as f:
         f.write("UTC")
     proc = Popen(["emerge", "--config", "sys-libs/timezone-data"])
@@ -262,15 +288,12 @@ def step16_sysconfig(args, cfg):
 
     os.chmod(hostname, 0o644)
 
-    proc = Popen(["eix-update"])
-    proc.communicate()
-
     os.remove(os.path.join(os.sep, 'etc', 'resolv.conf'))
 
     completestep(16, "sysconfig")
 
 def step17_fstab(args, cfg):
-    print(f"\t:: Step 17: fstab")
+    LOG.info(f":: Step 17: fstab")
     with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
         fstab.write(f"{cfg.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
 
@@ -279,6 +302,7 @@ def step17_fstab(args, cfg):
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
         f.write("done.")  # text in this file is not currently used.
+    LOG.info(f":: Step {step} {stepname} complete")
 
 
 def getlaststep(prefix='/tmp'):
@@ -290,20 +314,24 @@ def getlaststep(prefix='/tmp'):
         else:
             found = True
 
+        if i > LAST_STEP:
+            break;
+
+    LOG.info(f":: Starting off at step {i}")
     return i
 
 
 def stepdone(step, prefix='/tmp'):
     return os.path.exists(os.path.join(prefix, f"{step}.step"))
 
-def configure(args, config: dict):
+def configure(args, config: dict) -> int:
     # Load configuration
     if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         if not args.force:
             # We aren't in a gentoo live cd are we?
-            sys.stderr.write("Your system doesn't look like a gentoo live cd, exiting for safety.\n"
+            LOG.error("Your system doesn't look like a gentoo live cd, exiting for safety.\n"
                 "If you want to continue, use --force option and re-run `python -m gentooimgr install` with your configuration\n")
-            sys.exit(1)
+            sys.exit(gentooimgr.errorcodes.NOT_A_GENTOO_LIVE_ENV)
 
         else:
             # Assume we are root as per live cd, otherwise user should run this as root as a secondary confirmation
@@ -325,6 +353,13 @@ def configure(args, config: dict):
     if not stepdone(7): step7_repos(args, cfg)
     # portage env files and resolv.conf
     if not stepdone(8): step8_resolv(args, cfg)
+    # Move chroot out of step 9 and place it here, but ensure we are at the point (or greater) where this is needed:
+    step = getlaststep()
+    if step >= 9:
+        LOG.info(":: Binding and Mounting, Entering CHROOT")
+        gentooimgr.chroot.bind()
+        os.chroot(config.get("mountpoint"))
+
     # emerge --sync
     if not stepdone(9): step9_sync(args, cfg)
     # bindist
@@ -351,5 +386,6 @@ def configure(args, config: dict):
     # copy cloud cfg?
     gentooimgr.chroot.unbind()
     # Finish install processes like emaint and eix-update and news read
+    return gentooimgr.errorcodes.SUCCESS
 
 

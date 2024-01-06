@@ -2,8 +2,7 @@
     "inherit": "base.json",
     "packages": {
         "additional": [
-            "app-emulation/cloud-init",
-            "sys-block/open-iscsi"
+            "app-emulation/qemu-guest-agent",
         ]
     },
     "disk": "/dev/vda",
@@ -12,10 +11,7 @@
         "config": "cloud.config"
     },
     "services": {
-        "cloud-init-local": "default",
-        "cloud-init": "default",
-        "cloud-config": "default",
-        "cloud-final": "default"
+        "qemu-guest-agent": "default"
     },
     "partition": 1
 }

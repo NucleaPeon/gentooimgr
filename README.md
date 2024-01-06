@@ -68,6 +68,8 @@ cd /mnt/gi
 python -m gentooimgr --config-cloud install
 ```
 
+You can omit ``--config-cloud`` to create a basic gentoo image.
+
 Configuring the cloud image will automatically bring in appropriate kernel configs (these are defined in ``gentooimgr/configs/cloud.config``).
 
 Then perform any additional procedures, such as shrinking the img from 10G to ~3-4G

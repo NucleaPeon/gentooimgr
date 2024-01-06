@@ -12,4 +12,4 @@ def shrink(args, config,  stamp=None):
     filename = f"{name}-{stamp}{ext}"
     proc = Popen(["virt-sparsify", "--compress", args.img, filename])
     proc.communicate()
-    return filename
+    return filename, proc.returncode

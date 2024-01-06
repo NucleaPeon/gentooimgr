@@ -7,6 +7,9 @@ import multiprocessing
 
 # A day in seconds:
 DAY_IN_SECONDS = 60*60*24
+
+DAYS = 7  # To check for new images
+
 # Define threads to compile packages with
 THREADS = multiprocessing.cpu_count()
 # URL to latest image text file, defaults to amd64. This is parsed to find latest iso to download
@@ -101,7 +104,6 @@ def determine_config(args: argparse.Namespace) -> dict:
         sys.stderr.write(f"\tWW: Warning: Configuration {args.config} is empty\n")
     else:
         if configuration.get("inherit"):
-            # newpkgs = configuration.get("packages", {})
             inherited = inherit_config(configuration)
             new_packages = configuration.get("packages", {})
             old_packages = inherited.get("packages", {})

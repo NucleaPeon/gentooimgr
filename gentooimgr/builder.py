@@ -4,18 +4,20 @@ import gentooimgr.config as config
 import gentooimgr.download as download
 import gentooimgr.qemu as qemu
 import gentooimgr.common
+import gentooimgr.errorcodes
+from gentooimgr.logging import LOG
 import requests
 
-def build(args: argparse.Namespace, config: dict) -> None:
-
+def build(args: argparse.Namespace, config: dict) -> int:
     iso = config.get("iso") or download.download(args)
     stage3 = config.get("stage3") or download.download_stage3(args)
     portage = config.get("portage") or download.download_portage(args)
     filename = f"{args.image}.{args.format}"
-    image = qemu.create_image(args, config)
+    image, code = qemu.create_image(args, config)
     if not os.path.exists(image):
         raise Exception(f"Image {image} does not exist")
 
     is_default = os.path.basename(image) == filename
-    print(image)
+    LOG.info(f"\t:: {image}")
     print(f"Image {image} build successfully.\nRun `python -m gentooimgr run{' ' + image if not is_default else ''} --iso {iso}`")
+    return code

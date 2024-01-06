@@ -5,6 +5,10 @@ import argparse
 from subprocess import Popen, PIPE
 import gentooimgr.config
 import gentooimgr.common
+import gentooimgr.errorcodes
+from gentooimgr.logging import LOG
+
+
 def create_image(args, config: dict, overwrite: bool = False) -> str:
     """Creates an image (.img) file using qemu that will be used to create the cloud image
 
@@ -17,15 +21,21 @@ def create_image(args, config: dict, overwrite: bool = False) -> str:
         Full path to image file produced by qemu
     """
 
+    code = gentooimgr.errorcodes.SUCCESS
     image = gentooimgr.common.get_image_name(args, config)
     name, ext = os.path.splitext(image)
     if os.path.exists(image) and not overwrite:
-        return os.path.abspath(image)
+        return (os.path.abspath(image), code,)
 
     cmd = ['qemu-img', 'create', '-f', ext[1:], image, str(config.get("imgsize", "12G"))]
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
-    return os.path.abspath(image)
+    if proc.returncode != 0:
+        LOG.error(f"{stderr}")
+        code = gentooimgr.errorcodes.PROCESS_FAILED
+        sys.exit(code)
+
+    return (os.path.abspath(image), code,)
 
 def run_image(
     args: argparse.Namespace,
@@ -74,11 +84,12 @@ def run_image(
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
     cmd += qmounts
-    print(cmd)
+    LOG.debug(' '.join(cmd))
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
-    if stderr:
-        sys.stderr.write(str(stderr))
-        sys.stderr.write("\n")
+    if proc.returncode != 0:
+        LOG.error(f"{stderr}")
+
+    return proc.returncode
 
 

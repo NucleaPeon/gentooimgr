@@ -7,7 +7,8 @@ __all__ = ["CONFIG_DIR", "CLOUD_YAML", "HOST_TMPL", "HOSTNAME", "KNOWN_CONFIGS"]
 # List of configurations that end in '.json' within the configs/ directory
 KNOWN_CONFIGS = [
     "base",
-    "cloud"
+    "cloud",
+    "qemu"
 ]
 
 # Currently we handle the writing of additional files by having data defined here and checking options.

@@ -7,65 +7,79 @@ import copy
 import gentooimgr.common
 import gentooimgr.config
 import gentooimgr.configs
+import gentooimgr.errorcodes
+import gentooimgr.logging
 
 
 def main(args):
     '''Gentoo Cloud Image Builder Utility'''
     import gentooimgr.config
     configjson = gentooimgr.config.determine_config(args)
+    code = gentooimgr.errorcodes.SUCCESS
+    LOG = gentooimgr.logging.LOG
 
     if args.action == "build":
         import gentooimgr.builder
-        gentooimgr.builder.build(args, configjson)
+        code = gentooimgr.builder.build(args, configjson)
 
     elif args.action == "run":
         import gentooimgr.run
-        gentooimgr.run.run(args, configjson)
+        code = gentooimgr.run.run(args, configjson)
 
     elif args.action == "test":
         import gentooimgr.test
+        code = gentooimgr.errorcodes.NOT_IMPLEMENTED
 
     elif args.action == "clean":
         import gentooimgr.clean
+        code = gentooimgr.errorcodes.NOT_IMPLEMENTED
 
     elif args.action == "status":
         import gentooimgr.status
-        gentooimgr.status.print_template(args, configjson)
+        code = gentooimgr.status.print_template(args, configjson)
 
     elif args.action == "install":
         import gentooimgr.install
-        gentooimgr.install.configure(args, configjson)
+        code = gentooimgr.install.configure(args, configjson)
 
     elif args.action == "command":
         import gentooimgr.command
-        gentooimgr.command.command(configjson)
+        code = gentooimgr.command.command(configjson)
 
     elif args.action == "chroot":
         import gentooimgr.chroot
-        gentooimgr.chroot.chroot(path=args.mountpoint, shell="/bin/bash")
+        code = gentooimgr.chroot.chroot(path=args.mountpoint, shell="/bin/bash")
 
     elif args.action == "unchroot":
         import gentooimgr.chroot
-        gentooimgr.chroot.unchroot(path=args.mountpoint)
+        code = gentooimgr.chroot.unchroot(path=args.mountpoint)
 
     elif args.action == "shrink":
         import gentooimgr.shrink
-        fname = gentooimgr.shrink.shrink(args, configjson, stamp=args.stamp)
-        print(f"Shrunken image at {fname}, {os.path.getsize(fname)}")
+        fname, retcode = gentooimgr.shrink.shrink(args, configjson, stamp=args.stamp)
+        LOG.info(f"\t:: Shrunken image at {fname}, {os.path.getsize(fname)}")
+        code = gentooimgr.errorcodes.SUCCESS if retcode == 0 else gentooimgr.errorcodes.CONDITIONS_NOT_MET
 
     elif args.action == "kernel":
         import gentooimgr.kernel
-        gentooimgr.kernel.build_kernel(args, configjson)
+        code = gentooimgr.kernel.build_kernel(args, configjson)
+
+    return code
 
 if __name__ == "__main__":
     """Gentoo Cloud Image Builder Utility"""
     parser = argparse.ArgumentParser(prog="gentooimgr", description="Gentoo Image Builder Utility")
+    parser.add_argument("--debug", action="store_true", help="Enable verbose logging to stdout or file (with --logfile)")
+    parser.add_argument("--logfile", nargs='?', type=pathlib.Path, default=None,
+                        help="If this is set, log will write to the specified file. The default (unset) is to print to stdout")
     parser.add_argument("-c", "--config", nargs='?', type=pathlib.Path,
                         help="Path to a custom conf file")
     parser.add_argument("--config-cloud", action="store_const", const="cloud.json", dest="config",
                         help="Use cloud init configuration")
     parser.add_argument("--config-base", action="store_const", const="base.json", dest="config",
                         help="Use a minimal base Gentoo configuration")
+    parser.add_argument("-y", "--days", type=int, default=gentooimgr.config.DAYS,
+                        help="Number of days before the files are redownloaded")
 
     parser.add_argument("-t", "--temporary-dir", nargs='?', type=pathlib.Path,
                         default=os.getcwd(), help="Path to temporary directory for downloading files")
@@ -121,34 +135,44 @@ if __name__ == "__main__":
                               help="Use a distribution kernel in the installation. Overrides all other kernel options.")
     parser_install.add_argument("--kernel-virtio", action="store_true", help="Include virtio support in non-dist kernels")
     parser_install.add_argument("--kernel-g5", action="store_true", help="Include all kernel config options for PowerMac G5 compatibility")
+    parser_install.add_argument("-P", "--packages", nargs="*",
+                                help="List of 'additional' packages to install on top of the current configured package list.")
+    parser_install.add_argument("-S", "--services", nargs="*", help="Enable services; either specify the service name (ie: apache2) for "
+                                "a default level or service:level (ie: sshd:boot) for other levels. "
+                                "Useful if -P option specifies a package with a service to enable")
 
-    parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit")
+    parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit.")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
-                               help="Point to mount and run the chroot and shell")
+                               help="Point to mount and run the chroot and shell.")
 
     parser_unchroot = subparsers.add_parser("unchroot", help="Unmounts chroot filesystems")
     parser_unchroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
                                help="Point to mount and run the chroot and shell")
 
-    parser_cmd = subparsers.add_parser('command', help="Handle bind mounts and run command(s) in guest chroot, then unmount binds")
+    parser_cmd = subparsers.add_parser('command', help="Handle bind mounts and run command(s) in guest chroot, then unmount binds.")
     parser_cmd.add_argument("cmds", nargs='*',
-                            help="Commands to run (quote each command if more than one word, ie: \"grep 'foo'\" \"echo foo\")")
+                            help="Commands to run (quote each command if more than one word, ie: \"grep 'foo'\" \"echo foo\").")
 
-    parser_shrink = subparsers.add_parser('shrink', help="Take a finalized Gentoo image and rearrange it for smaller size")
-    parser_shrink.add_argument("img", type=pathlib.Path, help="Image to shrink")
+    parser_shrink = subparsers.add_parser('shrink', help="Take a finalized Gentoo image and rearrange it for smaller size.")
+    parser_shrink.add_argument("img", type=pathlib.Path, help="Image to shrink.")
     parser_shrink.add_argument("--stamp", nargs='?', default=None,
                                help="By default a timestamp will be added to the image name, otherwise provide "
-                               "a hardcoded string to add to the image name. Result: gentoo-[stamp].img")
+                               "a hardcoded string to add to the image name. Result: gentoo-[stamp].img.")
 
-    parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag")
+    parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag.")
 
 
     args = parser.parse_args()
+    gentooimgr.logging.set_logger(args)  # Pulls out logging parameters to configure logging for any process.
+    gentooimgr.logging.LOG.info(f"Running {args.action} action")
 
     isos = gentooimgr.common.find_iso(args.download_dir)
     if args.action == "run" and args.iso is None and len(isos) > 1:
-        print(f"Error: multiple iso files were found in {args.download_dir}, please specify one using `--iso [iso]`")
-        sys.exit(1)
+        gentooimgr.logging.LOG.error(
+            f"Error: multiple iso files were found in {args.download_dir}, "
+            "please specify one using `--iso [iso]` or set it in your configuration"
+        )
+        sys.exit(gentooimgr.errorcodes.CONDITIONS_NOT_MET)
 
 
-    main(args)
+    sys.exit(main(args))

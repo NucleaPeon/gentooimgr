@@ -14,7 +14,7 @@
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
             "gentoo": {
-                "sync-uri": "rsync://192.168.254.20/gentoo-portage"
+                "sync-uri": "rsync://192.168.254.45/gentoo-portage"
             }
         }
     },
@@ -47,7 +47,9 @@
             "net-fs/nfs-utils",
             "linux-firmware"
         ],
-        "additional": ["app-editors/vim"],
+        "additional": [
+            "app-editors/vim"
+        ],
         "oneshots": [
             "portage"
         ],
@@ -68,10 +70,12 @@
         ]
     },
     "services": {
+        "sshd": "default",
         "syslog-ng": "default",
         "cronie": "default",
         "acpid": "default",
-        "ntp": "default"
+        "ntpd": "default",
+        "nfsclient": "default"
     },
     "iso": null,
     "portage": null,

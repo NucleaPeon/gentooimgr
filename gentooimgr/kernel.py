@@ -7,7 +7,8 @@ from subprocess import Popen, PIPE
 import time
 
 import gentooimgr.configs
-
+from gentooimgr.logging import LOG
+import gentooimgr.errorcodes
 DEFAULT_KERNEL_CONFIG_PATH = os.path.join(os.sep, 'etc', 'kernel', 'default.config')
 
 def kernel_conf_apply(args, config):
@@ -16,6 +17,8 @@ def kernel_conf_apply(args, config):
     # Default is the json file's name but with .config extension.
     kernelconfig = os.path.join(gentooimgr.configs.CONFIG_DIR,
                                 config.get("kernel", {}).get("config", f"{fname}.config"))
+    if not os.path.exists(kernelconfig):
+        LOG.error(f"Expected kernel configuration file does not exist {kernelconfig}")
     kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
     if os.path.exists(kernelpath):
         os.remove(kernelpath)
@@ -23,28 +26,58 @@ def kernel_conf_apply(args, config):
         # Ensure if we have directories specified that they exist
         os.makedirs(os.path.dirname(kernelpath), exist_ok=True)
 
+    LOG.info(f"\t:: Copying kernel config {kernelconfig} to {kernelpath}")
+
     shutil.copyfile(kernelconfig, kernelpath)
 
-def build_kernel(args, config):
+def build_kernel(args, config) -> int:
+    code = gentooimgr.errorcodes.SUCCESS
+    if args.kernel_dist:
+        # Distribution kernel builds itself so the package step handles this.
+        LOG.warning("--kernel-dist is enabled so no actual build is performed here; "
+            "Running `emerge sys-kernel/gentoo-kernel-bin` will install the kernel "
+            "if you want this done in its own step.")
+        return code
+
     if config.get("kernel", {}).get("config") is None:
         kernel_default_config(args, config)
     os.chdir(args.kernel_dir)
     kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
     kernel_conf_apply(args, config)
-    proc = Popen(['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--no-menuconfig', 'all'])
+    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--no-menuconfig', 'all']
+    proc = Popen(cmd)
     proc.communicate()
+    if proc.returncode != 0:
+        LOG.warning(f"Genkernel command `{' '.join(cmd)}` failed")
     kernel_save_config(args, config)
+    return code
 
 def kernel_default_config(args, config):
+    code = gentooimgr.errorcodes.SUCCESS
     os.chdir(args.kernel_dir)
-    proc = Popen(["make", "defconfig"])
+    cmd = ["make", "defconfig"]
+    proc = Popen(cmd)
     proc.communicate()
+    if proc.returncode != 0:
+        LOG.warning(f"kernel command `{' '.join(cmd)}` failed")
+        # Return proper error code, but don't necessarily exit.
+        code = gentooimgr.errorcodes.PROCESS_FAILED
+
+    return code
 
 def kernel_save_config(args, config):
+    code = gentooimgr.errorcodes.SUCCESS
     os.chdir(args.kernel_dir)
     """Saves the current .config file"""
-    proc = Popen(["make", "savedefconfig"])
+    cmd = ["make", "savedefconfig"]
+    proc = Popen(cmd)
     proc.communicate()
+    if proc.returncode != 0:
+        LOG.warning(f"kernel command `{' '.join(cmd)}` failed")
+        # Return proper error code, but don't necessarily exit.
+        code = gentooimgr.errorcodes.PROCESS_FAILED
+
+    return code
 
 GRUB_CFG = """
 # Copyright 1999-2015 Gentoo Foundation
