@@ -3,19 +3,23 @@
     "packages": {
         "additional": [
             "app-emulation/cloud-init",
-            "sys-block/open-iscsi"
+            "sys-block/open-iscsi",
+            "net-misc/ntp"
         ]
     },
+    "serial": true,
     "disk": "/dev/vda",
     "kernel": {
         "path": "/etc/kernels/config.d/gentooimgr-cloud.config",
-        "config": "cloud.config"
+        "config": "cloud.config",
+        "commandline": "net.ifnames=0 vga=791 console=tty0 console=ttyS0,115200"
     },
     "services": {
         "cloud-init-local": "default",
         "cloud-init": "default",
         "cloud-config": "default",
-        "cloud-final": "default"
+        "cloud-final": "default",
+        "ntpd": "default"
     },
     "partition": 1
 }

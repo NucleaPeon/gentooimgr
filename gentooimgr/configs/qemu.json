@@ -3,15 +3,20 @@
     "packages": {
         "additional": [
             "app-emulation/qemu-guest-agent",
+            "sys-process/cronie"
         ]
     },
     "disk": "/dev/vda",
     "kernel": {
-        "path": "/etc/kernels/config.d/gentooimgr-cloud.config",
-        "config": "cloud.config"
+        "path": "/etc/kernels/config.d/gentooimgr-qemu.config",
+        "config": "qemu.config"
     },
     "services": {
-        "qemu-guest-agent": "default"
+        "qemu-guest-agent": "default",
+        "cronie": "default"
+    },
+    "passwords": {
+        "root": "root"
     },
     "partition": 1
 }

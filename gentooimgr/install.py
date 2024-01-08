@@ -21,18 +21,24 @@ from gentooimgr.logging import LOG
 from gentooimgr.configs import *
 
 FILES_DIR = os.path.join(HERE, "..")
-LAST_STEP = 17
+LAST_STEP = 18
 
 def step1_diskprep(args, cfg):
     LOG.info(":: Step 1: Disk Preparation")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
-    cmds = [
+    cmds = []
+    if args.parttype == "MBR":
+        cmds.extend([
             ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', 'msdos'],
             ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '2048s', '100%'],
             ['partprobe'],
             ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{cfg.get("partition", 1)}']
-    ]
+        ])
+    elif args.parttype == "EFI":
+        cmds.extend([
+
+        ])
 
     for c in cmds:
         LOG.debug(' '.join(c))
@@ -74,6 +80,7 @@ def step5_portage(args, cfg):
     if not portage:
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
 
+    portage = str(portage)  # --portage = posixpath, not str
     LOG.info(f"\t:: Portage file selected: {portage}")
     cmd = ["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"]
     LOG.debug(" ".join(cmd))
@@ -132,6 +139,8 @@ def step7_repos(args, cfg):
 
 def step8_resolv(args, cfg):
     LOG.info(f':: Step 8: Resolv')
+    if not os.path.exists(cfg.get("mountpoint")):
+        return
     proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
     proc.communicate()
     # Copy all step files and python module to new chroot
@@ -214,7 +223,9 @@ def step12_grub(args, cfg):
         sys.exit(code)
 
     with open("/etc/default/grub", 'w') as f:
-        f.write(f"{gentooimgr.kernel.GRUB_CFG}")
+        cli = cfg.get("kernel", {}).get("commandline", "")
+        grubtxt = gentooimgr.kernel.GRUB_CFG.format(cli)
+        f.write(f"{grubtxt}")
 
     proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     proc.communicate()
@@ -222,8 +233,9 @@ def step12_grub(args, cfg):
 
 def step13_serial(args, cfg):
     LOG.info(f":: Step 13: Serial")
-    os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
-    os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
+    if cfg.get("serial"):
+        os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
+        os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
     completestep(13, "serial")
 
 def step14_services(args, cfg):
@@ -262,22 +274,24 @@ def step16_sysconfig(args, cfg):
 
     modloadpath = os.path.join(os.sep, 'etc', 'modules-load.d')
     os.makedirs(modloadpath, exist_ok=True)
-    with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
-        f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
+    if args.config == "cloud" or args.force_cloud:
+        # Maybe there's a better way to do this than a hardcoded check within the install process.
+        with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
+            f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
 
-    cloudcfg = os.path.join(os.sep, 'etc', 'cloud')
-    if not os.path.exists(cloudcfg):
-        os.makedirs(cloudcfg, exist_ok=True)
-        os.makedirs(os.path.join(cloudcfg, 'templates'), exist_ok=True)
-    with open(os.path.join(cloudcfg, 'cloud.cfg'), 'w') as cfg:
-        cfg.write(f"{CLOUD_YAML}")
+        cloudcfg = os.path.join(os.sep, 'etc', 'cloud')
+        if not os.path.exists(cloudcfg):
+            os.makedirs(cloudcfg, exist_ok=True)
+            os.makedirs(os.path.join(cloudcfg, 'templates'), exist_ok=True)
+        with open(os.path.join(cloudcfg, 'cloud.cfg'), 'w') as cfg:
+            cfg.write(f"{CLOUD_YAML}")
 
-    os.chmod(os.path.join(cloudcfg, "cloud.cfg"), 0o644)
+        os.chmod(os.path.join(cloudcfg, "cloud.cfg"), 0o644)
 
-    with open(os.path.join(cloudcfg, "templates", "hosts.gentoo.tmpl"), 'w') as tmpl:
-        tmpl.write(f"{HOST_TMPL}") # FIXME:
+        with open(os.path.join(cloudcfg, "templates", "hosts.gentoo.tmpl"), 'w') as tmpl:
+            tmpl.write(f"{HOST_TMPL}") # FIXME:
 
-    os.chmod(os.path.join(cloudcfg, "templates", "hosts.gentoo.tmpl"), 0o644)
+        os.chmod(os.path.join(cloudcfg, "templates", "hosts.gentoo.tmpl"), 0o644)
 
     proc = Popen("sed -i 's/domain_name\,\ domain_search\,\ host_name/domain_search/g' /etc/dhcpcd.conf", shell=True)
     proc.communicate()
@@ -298,6 +312,41 @@ def step17_fstab(args, cfg):
         fstab.write(f"{cfg.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
 
     completestep(17, "fstab")
+
+def step18_passwd(args, cfg):
+    """Keep in mind that users that do not exist but have passwords may silently fail.
+    If a user is not in /etc/shadow, the sed command will fail.
+    """
+    LOG.info(f":: Step 18: Setting Root Password")
+    passwords = cfg.get("passwords", {})
+    if passwords:
+        shutil.copyfile("/etc/shadow", "/root/shadow.bak")
+        # https://wiki.gentoo.org/wiki/Setting_a_default_root_password
+        cmd = """sed -i 's/{user}:\*/{user}\:{passwdhash}/' /etc/shadow"""
+        for user, passwd in passwords.items():
+            proc = Popen(["openssl", "passwd", "-6", passwd], stdout=PIPE, stderr=PIPE)
+            stdout, stderr = proc.communicate()
+            if stderr:
+                LOG.error(f"\t:: Password change for {user} contained error with return code {proc.returncode}.")
+                continue  # do not attempt to store a hash that fails
+
+            passwdhash = stdout.strip()
+            LOG.info(f"passwdhash {passwdhash}")
+            """DEV NOTE:
+                Using sed is an option, but that requires some \ escaping; hashes especially would require
+                search/replacing certain characters and it's more straightforward and simple to show
+                exactly what we are doing in this code snippet.
+            """
+            wholefile = []
+            with open('/etc/shadow', 'r') as f:
+                for line in f.readlines():
+                    if line.startswith(user):
+                        line = line.replace("*", passwdhash.decode("utf-8"))
+                    wholefile.append(line)
+            with open('/etc/shadow', 'w') as f:
+                f.write(''.join(wholefile))  # Write it all out
+
+    completestep(18, "passwords")
 
 def completestep(step, stepname, prefix='/tmp'):
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
@@ -324,6 +373,13 @@ def getlaststep(prefix='/tmp'):
 def stepdone(step, prefix='/tmp'):
     return os.path.exists(os.path.join(prefix, f"{step}.step"))
 
+def prechroot(args, cfg):
+    """Work that is done pre-chroot to ensure all required files thereonin are accessible in their
+    appropriate places
+    """
+    LOG.info("\t::Doing some pre-chroot work")
+    gentooimgr.kernel.kernel_copy_conf(args, cfg)
+
 def configure(args, config: dict) -> int:
     # Load configuration
     if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
@@ -332,10 +388,6 @@ def configure(args, config: dict) -> int:
             LOG.error("Your system doesn't look like a gentoo live cd, exiting for safety.\n"
                 "If you want to continue, use --force option and re-run `python -m gentooimgr install` with your configuration\n")
             sys.exit(gentooimgr.errorcodes.NOT_A_GENTOO_LIVE_ENV)
-
-        else:
-            # Assume we are root as per live cd, otherwise user should run this as root as a secondary confirmation
-            os.makedirs(gentooimgr.config.GENTOO_MOUNT)
     # disk prep
     cfg = config
     if not stepdone(1): step1_diskprep(args, cfg)
@@ -353,10 +405,10 @@ def configure(args, config: dict) -> int:
     if not stepdone(7): step7_repos(args, cfg)
     # portage env files and resolv.conf
     if not stepdone(8): step8_resolv(args, cfg)
-    # Move chroot out of step 9 and place it here, but ensure we are at the point (or greater) where this is needed:
-    step = getlaststep()
-    if step >= 9:
+    # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
+    if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         LOG.info(":: Binding and Mounting, Entering CHROOT")
+        prechroot(args, cfg)
         gentooimgr.chroot.bind()
         os.chroot(config.get("mountpoint"))
 
@@ -383,6 +435,7 @@ def configure(args, config: dict) -> int:
     if not stepdone(16): step16_sysconfig(args, cfg)
     # fstab
     if not stepdone(17): step17_fstab(args, cfg)
+    if not stepdone(18): step18_passwd(args, cfg)
     # copy cloud cfg?
     gentooimgr.chroot.unbind()
     # Finish install processes like emaint and eix-update and news read

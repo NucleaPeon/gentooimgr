@@ -11,12 +11,17 @@ from gentooimgr.logging import LOG
 import gentooimgr.errorcodes
 DEFAULT_KERNEL_CONFIG_PATH = os.path.join(os.sep, 'etc', 'kernel', 'default.config')
 
-def kernel_conf_apply(args, config):
-    """Kernel configuration is a direct copy of a full complete config file"""
+def kernel_copy_conf(args, config, inchroot=False):
+    """Kernel configuration is a direct copy of a full complete config file.
+    This method overrwrites the target config file, but calling from build_kernel()
+    will skip it if it exists.
+    If you need a fresh config, call it from the ``install`` action instead of ``kernel``,
+    remove it manually, or add the --force option.
+    """
     fname, ext = os.path.splitext(args.config)
     # Default is the json file's name but with .config extension.
-    kernelconfig = os.path.join(gentooimgr.configs.CONFIG_DIR,
-                                config.get("kernel", {}).get("config", f"{fname}.config"))
+    CONFIG_DIR = gentooimgr.configs.CONFIG_DIR
+    kernelconfig = os.path.join(CONFIG_DIR, config.get("kernel", {}).get("config", f"{fname}.config"))
     if not os.path.exists(kernelconfig):
         LOG.error(f"Expected kernel configuration file does not exist {kernelconfig}")
     kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
@@ -27,7 +32,6 @@ def kernel_conf_apply(args, config):
         os.makedirs(os.path.dirname(kernelpath), exist_ok=True)
 
     LOG.info(f"\t:: Copying kernel config {kernelconfig} to {kernelpath}")
-
     shutil.copyfile(kernelconfig, kernelpath)
 
 def build_kernel(args, config) -> int:
@@ -39,12 +43,15 @@ def build_kernel(args, config) -> int:
             "if you want this done in its own step.")
         return code
 
+    os.chdir(args.kernel_dir)
     if config.get("kernel", {}).get("config") is None:
         kernel_default_config(args, config)
-    os.chdir(args.kernel_dir)
     kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
-    kernel_conf_apply(args, config)
+    LOG.info(f"\t:: Using kernel configuration at {kernelpath}")
+    if not os.path.exists(kernelpath) or args.force:
+        kernel_copy_conf(args, config)
     cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--no-menuconfig', 'all']
+    LOG.debug(' '.join(cmd))
     proc = Popen(cmd)
     proc.communicate()
     if proc.returncode != 0:
@@ -102,7 +109,7 @@ GRUB_DISTRIBUTOR="Gentoo"
 
 # Append parameters to the linux kernel command line
 # openrc only spits to the last console=tty
-GRUB_CMDLINE_LINUX="net.ifnames=0 vga=791 console=tty0 console=ttyS0,115200"
+GRUB_CMDLINE_LINUX="{}"
 #
 # Examples:
 #

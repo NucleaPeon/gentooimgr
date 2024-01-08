@@ -23,7 +23,6 @@
             "acpid",
             "dmidecode",
             "syslog-ng",
-            "cronie",
             "dhcpcd",
             "mlocate",
             "xfsprogs",
@@ -43,7 +42,6 @@
             "logrotate",
             "gptfdisk",
             "sys-block/gpart",
-            "net-misc/ntp",
             "net-fs/nfs-utils",
             "linux-firmware"
         ],
@@ -72,9 +70,7 @@
     "services": {
         "sshd": "default",
         "syslog-ng": "default",
-        "cronie": "default",
         "acpid": "default",
-        "ntpd": "default",
         "nfsclient": "default"
     },
     "iso": null,

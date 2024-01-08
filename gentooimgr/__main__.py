@@ -75,11 +75,17 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config", nargs='?', type=pathlib.Path,
                         help="Path to a custom conf file")
     parser.add_argument("--config-cloud", action="store_const", const="cloud.json", dest="config",
-                        help="Use cloud init configuration")
+                        help="Use cloud init configuration (qemu + cloud-init)")
+    parser.add_argument("--config-qemu", action="store_const", const="qemu.json", dest="config",
+                        help="Use a plain qemu configuration")
     parser.add_argument("--config-base", action="store_const", const="base.json", dest="config",
                         help="Use a minimal base Gentoo configuration")
     parser.add_argument("-y", "--days", type=int, default=gentooimgr.config.DAYS,
                         help="Number of days before the files are redownloaded")
+    parser.add_argument("--use-efi", action="store_const", const="efi", dest="parttype",
+                        help="Enable EFI for the resulting gentoo image partition type. If not set, is autodetected.")
+    parser.add_argument("--use-mbr", action="store_const", const="mbr", dest="parttype",
+                        help="Enable MBR for the resulting gentoo image partition type If not set, is autodetected.")
 
     parser.add_argument("-t", "--temporary-dir", nargs='?', type=pathlib.Path,
                         default=os.getcwd(), help="Path to temporary directory for downloading files")
@@ -93,6 +99,10 @@ if __name__ == "__main__":
                         help="Select SystemD as the Gentoo Init System")
     parser.add_argument("-f", "--force", action="store_true",
                         help="Let action occur at potential expense of data loss or errors (applies to clean and cloud-cfg)")
+    parser.add_argument("--force-cloud", action='store_true',
+                        help="Enables cloud-init configuration in the install phase, even if not using --config-cloud."
+                        " Enables cloud modules, templates, yaml config and respective permissions. You are expected"
+                        " to include cloud-init packages in your config.")
     parser.add_argument("--format", default="qcow2", help="Image format to generate, default qcow2")
     parser.add_argument("--portage", default=None, type=pathlib.Path, nargs='?',
                             help="Extract the specified portage package onto the filesystem")

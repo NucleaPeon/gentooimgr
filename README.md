@@ -32,13 +32,10 @@ Roadmap
 -------
 
 * [X] Use gentooimgr to configure and Install a Base Gentoo OS using the least amount of configuration
-
-    - Successfully built a gentoo qcow2 image that can be run in qemu, but it requires using the --dist-kernel flag
-      as building from source still requires some work.
-
-* [X] Use gentooimgr to create a usable cloud image (requires --dist-kernel currently)
+* [X] Use gentooimgr to create a usable cloud image without a binary dist kernel
 * [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64)
-
+* [ ] Allow better handling from image building third party software such as ansible and terraform
+* [ ] Build turnkey (LXC) images
 
 Prerequisites 
 -------------
@@ -47,11 +44,11 @@ Prerequisites
 * [ ] python3.11
 * [ ] Recommended 20GB of space
 * [ ] Internet Connection
-* [ ] virt-sparsify (for use with `gentooimgr shrink` action)
+* [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional)
 
 
-Usage
------
+Quick Start
+-----------
 
 ```sh
 git clone https://github.com/NucleaPeon/gentooimgr.git
@@ -81,7 +78,6 @@ python -m gentooimgr shrink gentoo.qcow2
 **NOTE** Due to how ``gentooimgr`` dynamically finds the most recent portage/stage3 and iso files, if multiples exist in the same directory you may have to specify them using the appropriate flag (ie: ``--iso [path-to-iso]``). Older images can be used in this manner and eventually setting those values in the .json file should be recognized by gentooimgr so there will be no need to specify them on the command line.
 
 
-
 Extended Usage
 --------------
 
@@ -104,7 +100,7 @@ There are also commands that allow you to quickly enter the livecd chroot or run
 python -m gentooimgr chroot
 ```
 
-Mounts/binds are handled automatically when you chroot, but you will need to ``unchroot`` after to unmount the file systems:
+Mounts/binds are handled automatically when you chroot, but you will need to ``unchroot`` after to unmount the file systems. This is because automating unmounts right after chroot exit hasn't worked correctly (needs investigation), but an explicit unmount in an interactive shell does work as expected. Some errors may be outputted/logged, but they are not fatal.
 
 ```sh
 python -m gentooimgr chroot
@@ -112,6 +108,14 @@ python -m gentooimgr chroot
 exit
 python -m gentooimgr unchroot
 ```
+
+
+Built-In Configurations
+-----------------------
+
+* ``--config-base``: A basic gentoo installation with default source kernel
+* ``--config-qemu``: A basic gentoo installation for use in qemu virtualized environments
+* ``--config-cloud``: A basic gentoo cloud-image installation similar to ``--config-qemu``. Contains ``rust``.
 
 
 Adding Image to Proxmox
@@ -149,7 +153,9 @@ Work may be done to see if this can be avoided, but for now consider it a requir
 TODO
 ----
 
+* [ ] EFI partition type functionality
 * [ ] Hash check portage downloads on ``build``
+* [ ] Abide by -y --days parameter for doing any checks for new gentoo files.
 * [ ] have a way to set the iso creation to either ignore things not set in the config file, or have options to include dirs, etc.
 * [ ] --skip-update-check : Do not even attempt to download new files in any capacity, simply use the latest ones found.
         We could implement a way to find by glob and filter by modified by state and simply use the latest modified file

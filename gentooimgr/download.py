@@ -162,6 +162,8 @@ def download(args, url=None) -> str:
 
     Will cause program to exit if iso byte size fails to match expected value.
     """
+    # TODO: ensure downloads and even checks are based on the values from checks from last request
+    # This may mean looking for all files (based on regex/glob) and checking dates, finding max, etc.
     if url is None:
         url = os.path.join(config.GENTOO_BASE_ISO_URL, config.GENTOO_LATEST_ISO_FILE)
 
