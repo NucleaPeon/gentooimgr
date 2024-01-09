@@ -25,6 +25,9 @@ def kernel_copy_conf(args, config, inchroot=False):
     if not os.path.exists(kernelconfig):
         LOG.error(f"Expected kernel configuration file does not exist {kernelconfig}")
     kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
+    if not inchroot:
+        # Remove leading / from kernelpath and prepend our mountpoint for a proper non-chroot path (default)
+        kernelpath = os.path.join(config.get("mountpoint", gentooimgr.config.GENTOO_MOUNT), kernelpath.lstrip(os.sep))
     if os.path.exists(kernelpath):
         os.remove(kernelpath)
     else:

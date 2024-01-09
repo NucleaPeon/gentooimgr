@@ -202,12 +202,11 @@ def step10_emerge_pkgs(args, cfg):
     completestep(10, "pkgs")
 
 def step11_kernel(args, cfg):
-    # at this point, genkernel will be installed
+    # at this point, genkernel will be installed. Please note that configuration files must be copied before this point
     LOG.info(f":: Step 11: kernel")
     proc = Popen(["eselect", "kernel", "set", "1"])
     proc.communicate()
     if not args.kernel_dist:
-        os.chdir(args.kernel_dir)
         threads = str(gentooimgr.config.THREADS)
         gentooimgr.kernel.build_kernel(args, cfg)
 
@@ -379,6 +378,8 @@ def prechroot(args, cfg):
     """
     LOG.info("\t::Doing some pre-chroot work")
     gentooimgr.kernel.kernel_copy_conf(args, cfg)
+    exists = os.path.exists(cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH))
+    LOG.info(f"\t::Kernel configuration exists: {exists}")
 
 def configure(args, config: dict) -> int:
     # Load configuration
@@ -410,7 +411,9 @@ def configure(args, config: dict) -> int:
         LOG.info(":: Binding and Mounting, Entering CHROOT")
         prechroot(args, cfg)
         gentooimgr.chroot.bind()
+        os.chdir(os.sep)
         os.chroot(config.get("mountpoint"))
+        os.chdir(os.sep)
 
     # emerge --sync
     if not stepdone(9): step9_sync(args, cfg)
