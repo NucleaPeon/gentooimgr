@@ -76,6 +76,5 @@
     "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": "/dev/sda",
-    "partition": 1
+    "disk": "/dev/sda"
 }

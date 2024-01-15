@@ -17,6 +17,5 @@
     },
     "passwords": {
         "root": "root"
-    },
-    "partition": 1
+    }
 }

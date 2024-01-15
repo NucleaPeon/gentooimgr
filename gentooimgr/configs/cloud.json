@@ -20,6 +20,5 @@
         "cloud-config": "default",
         "cloud-final": "default",
         "ntpd": "default"
-    },
-    "partition": 1
+    }
 }

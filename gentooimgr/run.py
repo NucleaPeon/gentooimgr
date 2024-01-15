@@ -8,11 +8,12 @@ from gentooimgr.logging import LOG
 
 def run(args, config: dict) -> int:
     mounts = args.mounts
-    # Specified image or look for gentoo.{img,qcow2}
     image = config.get("imagename") or args.image
+    auto_livecd = image is None and args.iso is None
     code = gentooimgr.errorcodes.SUCCESS
-    if not image:
+    if image is None:
         image, code = gentooimgr.qemu.create_image()
+
     # We need to package up our gentooimgr package into an iso and mount it to the running image
     # Why? basic gentoo livecd has no git and no pip installer. We want install to be simple
     # and use the same common codebase.
@@ -27,10 +28,12 @@ def run(args, config: dict) -> int:
 
     LOG.debug(args)
     LOG.info(main_iso)
+
     code = gentooimgr.qemu.run_image(
         args,
         config,
         # Add our generated mount and livecd (assumed)
-        mounts=[main_iso]
+        mounts=[main_iso],
+        livecd=auto_livecd
     )
     return code

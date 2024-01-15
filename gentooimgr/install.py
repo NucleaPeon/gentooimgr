@@ -28,17 +28,26 @@ def step1_diskprep(args, cfg):
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = []
-    if args.parttype == "MBR":
+    partnum = 1
+    if args.parttype == "efi":
         cmds.extend([
-            ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', 'msdos'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '2048s', '100%'],
-            ['partprobe'],
-            ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{cfg.get("partition", 1)}']
+            ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
+            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
+            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
         ])
-    elif args.parttype == "EFI":
-        cmds.extend([
+        partnum += 1
 
-        ])
+    else:
+        cmds.append(['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "msdos"])
+
+    cmds.extend([
+        ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '321MiB', '100%'], # is 2048s correct?
+        ['partprobe'],
+        ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{partnum}']
+    ])
+    partnum += 1  # in case we use this later, reflect partition number to use next.
+    if args.parttype == "efi":
+        cmds.append(['mkfs.fat', '-F', '32', '-n', 'EFI', f'{cfg.get("disk")}1'])
 
     for c in cmds:
         LOG.debug(' '.join(c))
@@ -49,10 +58,22 @@ def step1_diskprep(args, cfg):
 
 def step2_mount(args, cfg):
     LOG.info(f":: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}")
-    cmd = ["mount", f'{cfg.get("disk")}{cfg.get("partition")}', cfg.get("mountpoint")]
-    LOG.debug(' '.join(cmd))
-    proc = Popen(cmd)
-    proc.communicate()
+
+    partnum = 1
+    cmd = []
+    if args.parttype == "efi":
+        cmd.extend([
+            ["mount", f'{cfg.get("disk")}{partnum+1}', f"{cfg.get('mountpoint')}"],
+            ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi"],
+            ["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}/boot/efi"]
+        ])
+    else:
+        cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
+
+    for c in cmd:
+        LOG.debug(' '.join(c))
+        proc = Popen(c)
+        proc.communicate()
     completestep(2, "mount")
 
 def step3_stage3(args, cfg):
@@ -172,7 +193,7 @@ def step10_emerge_pkgs(args, cfg):
         proc = Popen(["emerge", "-j1", single])
         proc.communicate()
 
-    LOG.debug("KERNEL PACKAGES", packages.get("kernel"))
+    LOG.debug("KERNEL PACKAGES", str(packages.get("kernel")))
     if packages.get("kernel", []):
         cmd = ["emerge", "-j", str(args.threads)] + packages.get("kernel", [])
         proc = Popen(cmd)
@@ -182,6 +203,13 @@ def step10_emerge_pkgs(args, cfg):
     cmd += packages.get("keepgoing", [])
     proc = Popen(cmd)
     proc.communicate()
+
+
+    if args.parttype == "efi":
+        LOG.info(":: Setting GRUB_PLATFORMS in make.conf")
+        with open('/etc/portage/make.conf', 'a') as make_conf:
+            make_conf.write('GRUB_PLATFORMS="efi-64\n"')
+
 
     cmd = ["emerge", "-j", str(args.threads)]
     cmd += packages.get("base", [])
@@ -214,17 +242,23 @@ def step11_kernel(args, cfg):
 
 def step12_grub(args, cfg):
     LOG.info(f":: Step 12: kernel")
-    proc = Popen(["grub-install", cfg.get('disk')])
+    cmd = ["grub-install"]
+    if args.parttype == "efi":
+        cmd.append("--target=x86_64-efi")
+    cmd.append(cfg.get('disk'))
+
+    proc = Popen(cmd)
     proc.communicate()
     code = proc.returncode
     if code != 0:
         sys.stderr.write(f"Failed to install grub on {cfg.get('disk')}\n")
         sys.exit(code)
 
-    with open("/etc/default/grub", 'w') as f:
-        cli = cfg.get("kernel", {}).get("commandline", "")
-        grubtxt = gentooimgr.kernel.GRUB_CFG.format(cli)
-        f.write(f"{grubtxt}")
+    grubcli = cfg.get("kernel", {}).get("commandline", "")
+    if grubcli:
+        with open("/etc/default/grub", 'w') as f:
+            grubtxt = gentooimgr.kernel.GRUB_CFG.format(cli)
+            f.write(f"{grubtxt}")
 
     proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     proc.communicate()

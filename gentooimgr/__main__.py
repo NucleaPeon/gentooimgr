@@ -122,12 +122,15 @@ if __name__ == "__main__":
     parser_build.add_argument("--verify", dest="verify", action="store_true", default=True,
                               help="Verify downloaded iso")
     parser_build.add_argument("--redownload", action="store_true", help="Overwrite downloaded files")
-    parser_run = subparsers.add_parser('run', help="Run a Gentoo Image in QEMU to process it into a cloud image")
+    parser_run = subparsers.add_parser('run', help="Run a Gentoo Image in QEMU")
 
+    # Although not explicitly stated, if image is None and --iso is not defined, the gentoo
+    # live cd is automatically inserted to a cdrom device so a `python -m gentooimgr run` command gives the
+    # best experience in image building. It's only when user has a specific image or iso to mount that they will
+    # define them themselves. (config is also checked for image, mounts, iso, etc. so those should be blank as well)
     parser_run.add_argument("--iso", default=None, type=pathlib.Path, nargs='?',
                             help="Mount the specified iso in qemu, should be reserved for live cd images")
-    parser_run.add_argument("image", default=gentooimgr.config.GENTOO_IMG_NAME,
-                            type=pathlib.Path, nargs="?",
+    parser_run.add_argument("image", default=None, type=pathlib.Path, nargs="?",
                             help="Run the specified image in qemu")
     parser_run.add_argument("-m", "--mounts", nargs='+', default=[],
                             help="Path to iso files to mount into the running qemu instance")
