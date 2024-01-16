@@ -49,7 +49,7 @@ def run_image(
         - config: dict configuration from json file
         - livecd: bool whether to include the gentoo live cd
     """
-    iso = config.get("iso")
+    iso = config.get("iso") if not args.iso else args.iso
     if livecd:
         iso = gentooimgr.common.find_iso(
             os.path.join(
@@ -64,6 +64,7 @@ def run_image(
     if image is None:
         image = gentooimgr.common.get_image_name(args, config)
 
+    LOG.debug(f"\t:: Live cd is {livecd} for image {image} and iso {iso}")
     qmounts = []
     mounts.extend(args.mounts)
     for i in mounts:
@@ -76,23 +77,26 @@ def run_image(
         "-enable-kvm",
         "-m", str(config.get("memory", 2048)),
         "-smp", str(threads),
-        "-drive", f"file={image},if=virtio,index=0",
+        "-drive", f"file={image},if=virtio,index=0,format=raw",
         "-net", "nic,model=virtio",
         "-net", "user",
         "-vga", "virtio",
         "-cpu", "kvm64",
-        "-boot", "d",
         "-chardev", "file,id=charserial0,path=gentoo.log",
         "-device", "isa-serial,chardev=charserial0,id=serial0",
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
     if iso:
-        cmd.extend(["-cdrom", iso])
+        cmd += ["-drive", f"file={iso},format=raw", "-boot", "d"]  # Boot the first CD-ROM
+    else:
+        cmd += ["-boot", "c"]  # Boot first hard drive
 
     if args.parttype == 'efi':
         cmd += ["-bios", "/usr/share/edk2-ovmf/OVMF_CODE.fd"]
         cmd += config.get("qemu_cmd", ['-drive', 'file=/usr/share/edk2-ovmf/OVMF_CODE.fd,if=pflash,format=raw,unit=0,readonly=on'])
+        # cmd += ['-drive', 'if=pflash,format=raw,unit=1,file=/usr/share/edk2-ovmf/OVMF_VARS.fd']  # OVMF_VARS is for read/write storing of settings in efi.  /usr/share not writable with normal user.
+
 
     cmd += qmounts
     LOG.debug(' '.join(cmd))

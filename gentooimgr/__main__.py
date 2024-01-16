@@ -134,6 +134,8 @@ if __name__ == "__main__":
                             help="Run the specified image in qemu")
     parser_run.add_argument("-m", "--mounts", nargs='+', default=[],
                             help="Path to iso files to mount into the running qemu instance")
+    parser_run.add_argument("--use-live-cd", action="store_true",
+                            help="Ensure that livecd iso is mounted and booted from. If there is no image or --iso specified, this is assumed.")
 
     parser_test = subparsers.add_parser('test', help="Test whether image is a legitamite cloud configured image")
 
@@ -167,11 +169,15 @@ if __name__ == "__main__":
                             help="Commands to run (quote each command if more than one word, ie: \"grep 'foo'\" \"echo foo\").")
 
     parser_shrink = subparsers.add_parser('shrink', help="Take a finalized Gentoo image and rearrange it for smaller size.")
-    parser_shrink.add_argument("img", type=pathlib.Path, help="Image to shrink.")
+    parser_shrink.add_argument("image", type=pathlib.Path, help="Image to shrink.")
     parser_shrink.add_argument("--stamp", nargs='?', default=None,
                                help="By default a timestamp will be added to the image name, otherwise provide "
                                "a hardcoded string to add to the image name. Result: gentoo-[stamp].img.")
-
+    parser_shrink.add_argument("--convert", action="store_true",
+                               help="For EFI images, it will error when compressing. Use --convert to enable conversion from raw"
+                               " to qcow2 and then it will compress the result.")
+    parser_shrink.add_argument("--only-convert", action="store_true",
+                               help="Convert and exit, do not attempt to shrink the image.")
     parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag.")
 
 

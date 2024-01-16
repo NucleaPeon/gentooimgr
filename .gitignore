@@ -13,4 +13,6 @@ __pycache__/
 *.sha512
 *.img
 *.qcow2
+*.raw
+*.fd
 *.log

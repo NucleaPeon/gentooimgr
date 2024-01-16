@@ -47,7 +47,7 @@ def step1_diskprep(args, cfg):
     ])
     partnum += 1  # in case we use this later, reflect partition number to use next.
     if args.parttype == "efi":
-        cmds.append(['mkfs.fat', '-F', '32', '-n', 'EFI', f'{cfg.get("disk")}1'])
+        cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
 
     for c in cmds:
         LOG.debug(' '.join(c))
@@ -65,7 +65,8 @@ def step2_mount(args, cfg):
         cmd.extend([
             ["mount", f'{cfg.get("disk")}{partnum+1}', f"{cfg.get('mountpoint')}"],
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi"],
-            ["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}/boot/efi"]
+            ["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}/boot/efi"],
+            ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi/EFI/BOOT/"],
         ])
     else:
         cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
@@ -244,7 +245,7 @@ def step12_grub(args, cfg):
     LOG.info(f":: Step 12: kernel")
     cmd = ["grub-install"]
     if args.parttype == "efi":
-        cmd.append("--target=x86_64-efi")
+        cmd += ["--target=x86_64-efi", '--efi-directory=/boot/efi']
     cmd.append(cfg.get('disk'))
 
     proc = Popen(cmd)
@@ -262,6 +263,9 @@ def step12_grub(args, cfg):
 
     proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     proc.communicate()
+    # if using efi, copy resulting grubx64.efi to bootx64.efi
+    if args.parttype == "efi":
+        shutil.copyfile("/boot/efi/EFI/gentoo/grubx64.efi", "/boot/efi/EFI/BOOT/bootx64.efi")
     completestep(12, "grub")
 
 def step13_serial(args, cfg):
@@ -341,8 +345,12 @@ def step16_sysconfig(args, cfg):
 
 def step17_fstab(args, cfg):
     LOG.info(f":: Step 17: fstab")
+    partition = 1
     with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
-        fstab.write(f"{cfg.get('disk')}\t/\text4\tdefaults,noatime\t0 1\n")
+        if args.parttype == "efi":
+            fstab.write(f"{cfg.get('disk')}{partition}\t/boot\tvfat\tnoatime\t1 2\n")
+            partition += 1
+        fstab.write(f"{cfg.get('disk')}{partition}\t/\text4\tdefaults,noatime\t0 1\n")
 
     completestep(17, "fstab")
 

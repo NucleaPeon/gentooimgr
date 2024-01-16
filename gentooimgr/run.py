@@ -9,10 +9,10 @@ from gentooimgr.logging import LOG
 def run(args, config: dict) -> int:
     mounts = args.mounts
     image = config.get("imagename") or args.image
-    auto_livecd = image is None and args.iso is None
+    auto_livecd = image is None and args.iso is None or args.use_live_cd
     code = gentooimgr.errorcodes.SUCCESS
     if image is None:
-        image, code = gentooimgr.qemu.create_image()
+        image, code = gentooimgr.qemu.create_image(args, config, args.force)
 
     # We need to package up our gentooimgr package into an iso and mount it to the running image
     # Why? basic gentoo livecd has no git and no pip installer. We want install to be simple
