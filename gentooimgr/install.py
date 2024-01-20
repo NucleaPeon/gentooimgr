@@ -66,7 +66,7 @@ def step2_mount(args, cfg):
             ["mount", f'{cfg.get("disk")}{partnum+1}', f"{cfg.get('mountpoint')}"],
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi"],
             ["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}/boot/efi"],
-            ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi/EFI/BOOT/"],
+            ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi/EFI/BOOT/"]
         ])
     else:
         cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
@@ -258,7 +258,7 @@ def step12_grub(args, cfg):
     grubcli = cfg.get("kernel", {}).get("commandline", "")
     if grubcli:
         with open("/etc/default/grub", 'w') as f:
-            grubtxt = gentooimgr.kernel.GRUB_CFG.format(cli)
+            grubtxt = gentooimgr.kernel.GRUB_CFG.format(grubcli)
             f.write(f"{grubtxt}")
 
     proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
@@ -266,6 +266,14 @@ def step12_grub(args, cfg):
     # if using efi, copy resulting grubx64.efi to bootx64.efi
     if args.parttype == "efi":
         shutil.copyfile("/boot/efi/EFI/gentoo/grubx64.efi", "/boot/efi/EFI/BOOT/bootx64.efi")
+        # copy efi files to refind directory
+        bootdir = "/boot"
+        files = os.listdir(bootdir)
+        to_copy = [f for f in files if f.startswith("vmlinuz") or f.startswith("initramfs")]
+        for f in to_copy:
+            shutil.copyfile(os.path.join(bootdir, f),
+                            os.path.join(bootdir, "efi", 'EFI', 'gentoo', f'{f}.{"efi" if f.startswith("vmlinuz") else "img"}'))
+
     completestep(12, "grub")
 
 def step13_serial(args, cfg):
