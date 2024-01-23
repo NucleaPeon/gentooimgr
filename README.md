@@ -140,6 +140,15 @@ qm template 1000
 after you set username and password)
 ```
 
+Updating Kernel
+---------------
+
+Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel by default.
+The traditional ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file.
+If you plan on making your own changes to the kernel and having it built automatically, edit and save THAT file, instead of simply saving your menuconfig changes.
+
+Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
+
 Caveats
 --------
 
@@ -153,6 +162,7 @@ Work may be done to see if this can be avoided, but for now consider it a requir
 TODO
 ----
 
+* [ ] Do a check for /mnt/gentoo/etc/resolv.conf and if not found, auto copy it when using the ``chroot`` action so user isn't left without network access.
 * [ ] EFI partition type functionality
 * [ ] Hash check portage downloads on ``build``
 * [ ] Abide by -y --days parameter for doing any checks for new gentoo files.
@@ -160,3 +170,4 @@ TODO
 * [ ] --skip-update-check : Do not even attempt to download new files in any capacity, simply use the latest ones found.
         We could implement a way to find by glob and filter by modified by state and simply use the latest modified file
         each and every time so we don't fail on multiple file detections
+
