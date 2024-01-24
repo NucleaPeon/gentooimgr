@@ -33,7 +33,8 @@ def step1_diskprep(args, cfg):
         cmds.extend([
             ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
             ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
+            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on'],
+            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on']
         ])
         partnum += 1
 

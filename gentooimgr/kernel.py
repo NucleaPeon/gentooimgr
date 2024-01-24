@@ -53,7 +53,7 @@ def build_kernel(args, config) -> int:
     LOG.info(f"\t:: Using kernel configuration at {kernelpath}")
     if not os.path.exists(kernelpath) or args.force:
         kernel_copy_conf(args, config)
-    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--no-menuconfig', 'all']
+    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--bootdir=/boot/efi', '--no-menuconfig', 'all']
     LOG.debug(' '.join(cmd))
     proc = Popen(cmd)
     proc.communicate()
