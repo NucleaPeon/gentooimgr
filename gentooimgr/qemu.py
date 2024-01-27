@@ -28,6 +28,7 @@ def create_image(args, config: dict, overwrite: bool = False) -> str:
         return (os.path.abspath(image), code,)
 
     cmd = ['qemu-img', 'create', '-f', ext[1:], image, str(config.get("imgsize", "12G"))]
+    LOG.info(f":: Command to create qemu image {' '.join(cmd)}")
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:
@@ -57,7 +58,7 @@ def run_image(
                 ".."
             )
         )
-        if isinstance(iso, list):
+        if iso and isinstance(iso, list):
             iso = iso[0]
 
     image = args.image

@@ -244,9 +244,10 @@ def step11_kernel(args, cfg):
         # We need to copy the /boot/efi/{vmlinuz/System/initramfs files to /boot
         path = "/boot/efi"
         copyfiles = os.listdir(path)
-        for f in copyfiles if f.startswith("vmlinuz") or f.startswith("initramfs") or f.startswith("System"):
-            shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
-            LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
+        for f in copyfiles:
+            if f.startswith("vmlinuz") or f.startswith("initramfs") or f.startswith("System"):
+                shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
+                LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
 
     completestep(11, "kernel")
 

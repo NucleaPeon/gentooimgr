@@ -16,3 +16,4 @@ __pycache__/
 *.raw
 *.fd
 *.log
+gentooimgr.egg-info/

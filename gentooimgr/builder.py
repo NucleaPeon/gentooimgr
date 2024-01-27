@@ -6,7 +6,6 @@ import gentooimgr.qemu as qemu
 import gentooimgr.common
 import gentooimgr.errorcodes
 from gentooimgr.logging import LOG
-import requests
 
 def build(args: argparse.Namespace, config: dict) -> int:
     iso = config.get("iso") or download.download(args)
