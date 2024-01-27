@@ -53,10 +53,13 @@ def build_kernel(args, config) -> int:
     LOG.info(f"\t:: Using kernel configuration at {kernelpath}")
     if not os.path.exists(kernelpath) or args.force:
         kernel_copy_conf(args, config)
-    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--bootdir=/boot/efi', '--no-menuconfig', 'all']
+    # Using genkernel will save the config based on kernel version, so while we give it --kernel-config, output is /etc/kernels/kernel-[version]
+    # Assume we will want --virtio in all cases
+    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--bootdir=/boot/efi', '--no-menuconfig', '--virtio', 'all']
     LOG.debug(' '.join(cmd))
     proc = Popen(cmd)
     proc.communicate()
+
     if proc.returncode != 0:
         LOG.warning(f"Genkernel command `{' '.join(cmd)}` failed")
     kernel_save_config(args, config)
@@ -101,7 +104,7 @@ GRUB_CFG = """
 # See the grub info page for documentation on possible variables and
 # their associated values.
 
-GRUB_DISTRIBUTOR="Gentoo"
+GRUB_DISTRIBUTOR="GentooImgr"
 
 # Default menu entry
 #GRUB_DEFAULT=0

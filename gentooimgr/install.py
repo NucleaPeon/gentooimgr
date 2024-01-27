@@ -33,8 +33,8 @@ def step1_diskprep(args, cfg):
         cmds.extend([
             ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
             ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on']
+            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on'],
+            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
         ])
         partnum += 1
 
@@ -240,6 +240,14 @@ def step11_kernel(args, cfg):
         threads = str(gentooimgr.config.THREADS)
         gentooimgr.kernel.build_kernel(args, cfg)
 
+    if args.parttype == "efi":
+        # We need to copy the /boot/efi/{vmlinuz/System/initramfs files to /boot
+        path = "/boot/efi"
+        copyfiles = os.listdir(path)
+        for f in copyfiles if f.startswith("vmlinuz") or f.startswith("initramfs") or f.startswith("System"):
+            shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
+            LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
+
     completestep(11, "kernel")
 
 def step12_grub(args, cfg):
@@ -273,7 +281,7 @@ def step12_grub(args, cfg):
         to_copy = [f for f in files if f.startswith("vmlinuz") or f.startswith("initramfs")]
         for f in to_copy:
             shutil.copyfile(os.path.join(bootdir, f),
-                            os.path.join(bootdir, "efi", 'EFI', 'gentoo', f'{f}.{"efi" if f.startswith("vmlinuz") else "img"}'))
+                            os.path.join(bootdir, "efi", 'EFI', 'gentoo', f))
 
     completestep(12, "grub")
 
