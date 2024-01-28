@@ -72,13 +72,16 @@ def run_image(
         qmounts.append("-drive")
         qmounts.append(f"file={i},media=cdrom")
 
+    name, ext = os.path.splitext(image)
+    ext = ext.strip(".")
+
     threads = args.threads
     cmd = [
         "qemu-system-x86_64",
         "-enable-kvm",
         "-m", str(config.get("memory", 2048)),
         "-smp", str(threads),
-        "-drive", f"file={image},if=virtio,index=0,format=raw",
+        "-drive", f"file={image},if=virtio,index=0,format={ext}",
         "-net", "nic,model=virtio",
         "-net", "user",
         "-vga", "virtio",

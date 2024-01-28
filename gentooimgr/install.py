@@ -187,8 +187,8 @@ def step9_sync(args, cfg):
 def step10_emerge_pkgs(args, cfg):
     LOG.info(f":: Step 10: emerge pkgs")
     packages = cfg.get("packages", {})
-    for oneshot_up in packages.get("oneshots", []):
-        proc = Popen(["emerge", "--oneshot", "--update", oneshot_up])
+    for one in packages.get("oneshots", []):
+        proc = Popen(["emerge", "--oneshot", one])
         proc.communicate()
 
     for single in packages.get("singles", []):
@@ -218,7 +218,7 @@ def step10_emerge_pkgs(args, cfg):
     cmd += packages.get("additional", [])
     cmd += packages.get("bootloader", [])
     cmd += args.packages or []
-    LOG.info(f"\t:: Emerging package list command {cmd}")
+    LOG.info(f"\t:: Emerging package list command {str(cmd)}")
     proc = Popen(cmd)
     proc.communicate()
     try:
