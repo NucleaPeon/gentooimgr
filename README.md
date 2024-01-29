@@ -72,6 +72,32 @@ This is slightly more complicated.
 
 Ensure you have ovmf installed. On Gentoo, the package name is ``sys-firmware/edk2-ovmf`` or ``sys-firmware/edk2-ovmf-bin``. the latter of which is brought in by ``app-emulation/qemu`` automatically. I prefer using the non-binary version, but I had to uninstall the binary package after qemu was built. The path for locating the firmware is ``/usr/share/edk2-ovmf/OVMF_CODE.fd``, it may be different for Debian-based systems. (Currently this can be set with the ``--efi-firmware`` command line option.)
 
+For the ``run`` and ``install`` actions, you should add the global ``--use-efi`` option:
+
+```sh
+git clone https://github.com/NucleaPeon/gentooimgr.git
+python -m gentooimgr build
+python -m gentooimgr --use-efi run
+```
+
+In qemu:
+
+```sh
+mkdir -p /mnt/gi
+mount /dev/disk/by-label/gentooimgr /mnt/gi
+cd /mnt/gi
+python -m gentooimgr --use-efi --config-cloud install
+```
+
+Once you have the image built, if you are adding it to proxmox, you need to:
+
+* Set the bios to use OVMF (UEFI)
+* Do **NOT** add the EFI disk as it recommends you do, since it's already a part of the image.
+
+Test the image using:
+
+``
+
 
 Configurations
 ^^^^^^^^^^^^^^
@@ -130,6 +156,7 @@ Adding Image to Proxmox
 
 (Use the correct username and address to ssh/scp)
 
+
 ```sh
 scp gentoo-[stamp].qcow2 root@proxmox:/tmp
 ssh root@proxmox
@@ -147,11 +174,18 @@ qm template 1000
 after you set username and password)
 ```
 
+If you are having issues with EFI images on Proxmox, instead of using qcow2 image, change the following lines to reflect raw images:
+
+```sh
+qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format raw
+qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-disk-0.raw
+```
+
 Updating Kernel
 ---------------
 
 Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel by default.
-The traditional ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file.
+The traditional ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
 If you plan on making your own changes to the kernel and having it built automatically, edit and save THAT file, instead of simply saving your menuconfig changes.
 
 Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
