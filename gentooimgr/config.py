@@ -22,6 +22,7 @@ GENTOO_LATEST_STAGE_OPENRC_FILE = f"latest-stage3-{ARCHITECTURE}-openrc.txt"
 GENTOO_LATEST_STAGE_SYSTEMD_FILE = f"latest-stage3-{ARCHITECTURE}-systemd.txt"
 GENTOO_PORTAGE_FILE = "http://distfiles.gentoo.org/snapshots/portage-latest.tar.xz"  # No architecture, no txt files to determine latest.
 
+DEFAULT_GENTOO_EFI_FIRMWARE_PATH = "/usr/share/edk2-ovmf/OVMF_CODE.fd"
 GENTOO_MOUNT = "/mnt/gentoo"
 GENTOO_IMG_NAME = "gentoo.qcow2"
 

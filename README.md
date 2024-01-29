@@ -13,9 +13,7 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 * Caches the iso and stage3 .txt files for at most a day before redownloading and rechecking for new files
 * Sane and readable cli commands to build, run and test.
 * Step system to enable user to continue off at the same place if a step fails
-* No heavy packages like rust included ** TODO
-
-**rename to gentooimgr, upload to pip**
+* No heavy packages like rust included ** Cloud Init images do require rust, QEMU-only doesn't. (TODO)
 
 Preface
 -------
@@ -45,6 +43,8 @@ Prerequisites
 * [ ] Recommended 20GB of space
 * [ ] Internet Connection
 * [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional)
+* [ ] OVMF firmware for using EFI enabled images (optional)
+
 
 
 Quick Start
@@ -65,11 +65,27 @@ cd /mnt/gi
 python -m gentooimgr --config-cloud install
 ```
 
+Using EFI
+^^^^^^^^^
+
+This is slightly more complicated.
+
+Ensure you have ovmf installed. On Gentoo, the package name is ``sys-firmware/edk2-ovmf`` or ``sys-firmware/edk2-ovmf-bin``. the latter of which is brought in by ``app-emulation/qemu`` automatically. I prefer using the non-binary version, but I had to uninstall the binary package after qemu was built. The path for locating the firmware is ``/usr/share/edk2-ovmf/OVMF_CODE.fd``, it may be different for Debian-based systems. (Currently this can be set with the ``--efi-firmware`` command line option.)
+
+
+Configurations
+^^^^^^^^^^^^^^
+
+* ``--config-cloud`` will bring in the required components to create a cloud-init image
+* ``--config-qemu`` will bring in the required components to create a qemu-enabled image, runnable in qemu or by calling ``python -m gentooimgr run [resulting-image.qcow2]``
+
+Omitting a configuration will result in a ``base`` configuration image.
+
 You can omit ``--config-cloud`` to create a basic gentoo image.
 
-Configuring the cloud image will automatically bring in appropriate kernel configs (these are defined in ``gentooimgr/configs/cloud.config``).
+Using a built-in configuration flag will look in ``gentooimgr/configs/cloud.config`` for the corresponding configuration.
+Writing your own configuration file and specifying an ``inherit``ed configuration will also look there if no absolute path is given.
 
-Then perform any additional procedures, such as shrinking the img from 10G to ~3-4G
 
 ```sh
 python -m gentooimgr shrink gentoo.qcow2
@@ -108,15 +124,6 @@ python -m gentooimgr chroot
 exit
 python -m gentooimgr unchroot
 ```
-
-
-Built-In Configurations
------------------------
-
-* ``--config-base``: A basic gentoo installation with default source kernel
-* ``--config-qemu``: A basic gentoo installation for use in qemu virtualized environments
-* ``--config-cloud``: A basic gentoo cloud-image installation similar to ``--config-qemu``. Contains ``rust``.
-
 
 Adding Image to Proxmox
 -----------------------
@@ -162,6 +169,8 @@ Work may be done to see if this can be avoided, but for now consider it a requir
 TODO
 ----
 
+* [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
+* [ ] Upload to ``pip``
 * [ ] Do a check for /mnt/gentoo/etc/resolv.conf and if not found, auto copy it when using the ``chroot`` action so user isn't left without network access.
 * [ ] EFI partition type functionality
 * [ ] Hash check portage downloads on ``build``

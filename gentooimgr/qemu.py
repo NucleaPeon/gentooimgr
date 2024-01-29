@@ -97,10 +97,8 @@ def run_image(
         cmd += ["-boot", "c"]  # Boot first hard drive
 
     if args.parttype == 'efi':
-        cmd += ["-bios", "/usr/share/edk2-ovmf/OVMF_CODE.fd"]
-        cmd += config.get("qemu_cmd", ['-drive', 'file=/usr/share/edk2-ovmf/OVMF_CODE.fd,if=pflash,format=raw,unit=0,readonly=on'])
-        # cmd += ['-drive', 'if=pflash,format=raw,unit=1,file=/usr/share/edk2-ovmf/OVMF_VARS.fd']  # OVMF_VARS is for read/write storing of settings in efi.  /usr/share not writable with normal user.
-
+        cmd += ["-bios", args.efi_firmware]
+        cmd += config.get("qemu_cmd", ['-drive', f'file={args.efi_firmware},if=pflash,format=raw,unit=0,readonly=on'])
 
     cmd += qmounts
     LOG.debug(' '.join(cmd))

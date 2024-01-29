@@ -87,6 +87,8 @@ if __name__ == "__main__":
     parser.add_argument("--use-mbr", action="store_const", const="mbr", dest="parttype",
                         help="Enable MBR for the resulting gentoo image partition type If not set, is autodetected.")
 
+    parser.add_argument("--efi-firmware", nargs="?", default=gentooimgr.config.DEFAULT_GENTOO_EFI_FIRMWARE_PATH,
+                        help="Path to the EFI firmware (OVMF_CODE.fd or similar)")
     parser.add_argument("-t", "--temporary-dir", nargs='?', type=pathlib.Path,
                         default=os.getcwd(), help="Path to temporary directory for downloading files")
     parser.add_argument("-j", "--threads", type=int, default=gentooimgr.config.THREADS,
