@@ -1,5 +1,5 @@
-GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
-=====================================================================
+# GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
+
 
 GentooImgr is a python script system to build cloud images based on Gentoo Linux.
 
@@ -15,8 +15,7 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 * Step system to enable user to continue off at the same place if a step fails
 * No heavy packages like rust included ** Cloud Init images do require rust, QEMU-only doesn't. (TODO)
 
-Preface
--------
+## Preface
 
 This project was created so I could spawn off Gentoo OS templates on my Proxmox server for various services while being more efficient than many other Linux OS's and avoiding systemd.
 
@@ -26,8 +25,7 @@ This software is in beta so please report any issues or feature requests. You ar
 
 Thanks!
 
-Roadmap
--------
+## Roadmap
 
 * [X] Use gentooimgr to configure and Install a Base Gentoo OS using the least amount of configuration
 * [X] Use gentooimgr to create a usable cloud image without a binary dist kernel
@@ -35,8 +33,7 @@ Roadmap
 * [ ] Allow better handling from image building third party software such as ansible and terraform
 * [ ] Build turnkey (LXC) images
 
-Prerequisites 
--------------
+## Prerequisites
 
 * [ ] QEMU
 * [ ] python3.11
@@ -47,8 +44,7 @@ Prerequisites
 
 
 
-Quick Start
------------
+## Quick Start
 
 ```sh
 git clone https://github.com/NucleaPeon/gentooimgr.git
@@ -65,8 +61,7 @@ cd /mnt/gi
 python -m gentooimgr --config-cloud install
 ```
 
-Using EFI
-^^^^^^^^^
+### Using EFI
 
 This is slightly more complicated.
 
@@ -99,8 +94,7 @@ Test the image using:
 ``
 
 
-Configurations
-^^^^^^^^^^^^^^
+### Configurations
 
 * ``--config-cloud`` will bring in the required components to create a cloud-init image
 * ``--config-qemu`` will bring in the required components to create a qemu-enabled image, runnable in qemu or by calling ``python -m gentooimgr run [resulting-image.qcow2]``
@@ -120,8 +114,7 @@ python -m gentooimgr shrink gentoo.qcow2
 **NOTE** Due to how ``gentooimgr`` dynamically finds the most recent portage/stage3 and iso files, if multiples exist in the same directory you may have to specify them using the appropriate flag (ie: ``--iso [path-to-iso]``). Older images can be used in this manner and eventually setting those values in the .json file should be recognized by gentooimgr so there will be no need to specify them on the command line.
 
 
-Extended Usage
---------------
+## Extended Usage
 
 GentooImgr is flexible in that it can be run on a live running system as well as on a livecd in qemu;
 
@@ -151,8 +144,7 @@ exit
 python -m gentooimgr unchroot
 ```
 
-Adding Image to Proxmox
------------------------
+## Adding Image to Proxmox
 
 (Use the correct username and address to ssh/scp)
 
@@ -181,8 +173,7 @@ qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format raw
 qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-disk-0.raw
 ```
 
-Updating Kernel
----------------
+## Updating Kernel
 
 Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel by default.
 The traditional ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
@@ -190,8 +181,7 @@ If you plan on making your own changes to the kernel and having it built automat
 
 Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
 
-Caveats
---------
+## Caveats
 
 * [X] Forced use of Rust in cloud images (cloud-init dependency)
 
@@ -200,8 +190,7 @@ Unfortunately, using cloud-init brings in cryptography and oauthlib which pulls 
 Work may be done to see if this can be avoided, but for now consider it a requirement.
 
 
-TODO
-----
+## TODO
 
 * [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
 * [ ] Upload to ``pip``
