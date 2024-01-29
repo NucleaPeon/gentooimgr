@@ -91,7 +91,7 @@ Once you have the image built, if you are adding it to proxmox, you need to:
 
 Test the image using:
 
-``
+``python -m gentooimgr --use-efi run [gentoo-efi-name.qcow2]``
 
 
 ### Configurations
