@@ -195,7 +195,7 @@ def step10_emerge_pkgs(args, cfg):
         proc = Popen(["emerge", "-j1", single])
         proc.communicate()
 
-    LOG.debug("KERNEL PACKAGES", str(packages.get("kernel")))
+    LOG.debug(f"KERNEL PACKAGES {' '.join(packages.get('kernel')) }")
     if packages.get("kernel", []):
         cmd = ["emerge", "-j", str(args.threads)] + packages.get("kernel", [])
         proc = Popen(cmd)
@@ -210,7 +210,7 @@ def step10_emerge_pkgs(args, cfg):
     if args.parttype == "efi":
         LOG.info(":: Setting GRUB_PLATFORMS in make.conf")
         with open('/etc/portage/make.conf', 'a') as make_conf:
-            make_conf.write('GRUB_PLATFORMS="efi-64\n"')
+            make_conf.write("GRUB_PLATFORMS=\"efi-64\"\n")
 
 
     cmd = ["emerge", "-j", str(args.threads)]
@@ -218,7 +218,7 @@ def step10_emerge_pkgs(args, cfg):
     cmd += packages.get("additional", [])
     cmd += packages.get("bootloader", [])
     cmd += args.packages or []
-    LOG.info(f"\t:: Emerging package list command {str(cmd)}")
+    LOG.info(f"\t:: Emerging package list command {' '.join(cmd)}")
     proc = Popen(cmd)
     proc.communicate()
     try:
@@ -469,10 +469,15 @@ def configure(args, config: dict) -> int:
     # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
     if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         LOG.info(":: Binding and Mounting, Entering CHROOT")
-        prechroot(args, cfg)
-        gentooimgr.chroot.bind()
-        os.chdir(os.sep)
-        os.chroot(config.get("mountpoint"))
+        if not os.path.exists('/mnt/gentoo') and args.force:
+            LOG.info(":: Using --force, no /mnt/gentoo found so skipping chroot")
+
+        else:
+            prechroot(args, cfg)
+            gentooimgr.chroot.bind()
+            os.chdir(os.sep)
+            os.chroot(config.get("mountpoint"))
+
         os.chdir(os.sep)
 
     # emerge --sync
