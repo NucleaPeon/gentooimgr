@@ -14,7 +14,7 @@
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
             "gentoo": {
-                "sync-uri": "rsync://192.168.254.45/gentoo-portage"
+
             }
         }
     },
