@@ -59,6 +59,7 @@ mkdir -p /mnt/gi
 mount /dev/disk/by-label/gentooimgr /mnt/gi
 cd /mnt/gi
 python -m gentooimgr --config-cloud install
+python -m gentooimgr unchroot
 ```
 
 ### Using EFI
@@ -82,6 +83,7 @@ mkdir -p /mnt/gi
 mount /dev/disk/by-label/gentooimgr /mnt/gi
 cd /mnt/gi
 python -m gentooimgr --use-efi --config-cloud install
+python -m gentooimgr --use-efi unchroot
 ```
 
 Once you have the image built, if you are adding it to proxmox, you need to:
@@ -89,9 +91,12 @@ Once you have the image built, if you are adding it to proxmox, you need to:
 * Set the bios to use OVMF (UEFI)
 * Do **NOT** add the EFI disk as it recommends you do, since it's already a part of the image.
 
-Test the image using:
+**Test the image using**:
 
 ``python -m gentooimgr --use-efi run [gentoo-efi-name.qcow2]``
+
+Remove the serial options in the grub menu to get the login prompt. (Keep the ``vga`` option)
+
 
 
 ### Configurations
@@ -144,6 +149,15 @@ exit
 python -m gentooimgr unchroot
 ```
 
+## Encountered Issues
+
+During my testing and development of this project, I found a couple notable concerns.
+
+* Occassionally cmake fails to build. Not sure why this is, could be caused by the next issue I foundnetworkmanager
+* Autoconf-wrapper was failing to emerge due to file collisions. I had to implement an ``-I /usr -I /etc`` option to get the build past the ``emerge @world`` step. My guess is autoconf had a new version but as a system tool, gentoo errs on the stability side of things.
+
+
+
 ## Adding Image to Proxmox
 
 (Use the correct username and address to ssh/scp)
@@ -157,6 +171,7 @@ qm create 1000 --name gentoo-templ --memory 2048 --net0 virtio,bridge=vmbr0
 qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format qcow2
 qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-disk-0.qcow2
 qm set 1000 --ide2 local:cloudinit --boot c --bootdisk scsi0 --serial0 socket --vga serial0
+# The following statement is optional if you didn't shrink your disk image:
 qm resize 1000 scsi0 +20G
 qm set 1000 --ipconfig0 ip=dhcp
 qm set 1000 --sshkey ~/.ssh/id_rsa.pub
@@ -166,7 +181,7 @@ qm template 1000
 after you set username and password)
 ```
 
-If you are having issues with EFI images on Proxmox, instead of using qcow2 image, change the following lines to reflect raw images:
+If you are having issues with EFI images on Proxmox, instead of using qcow2 image, **USE RAW IMAGE SETTINGS**:
 
 ```sh
 qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format raw

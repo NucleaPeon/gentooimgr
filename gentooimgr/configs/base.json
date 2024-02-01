@@ -14,7 +14,7 @@
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
             "gentoo": {
-
+                "sync-uri": "rsync://192.168.254.45/gentoo-portage"
             }
         }
     },
@@ -59,7 +59,7 @@
             "openssh"
         ],
         "bootloader": [
-            "grub:2"
+            "sys-boot/grub:2"
         ],
         "kernel": [
             "sys-kernel/genkernel",

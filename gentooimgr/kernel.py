@@ -7,74 +7,104 @@ from subprocess import Popen, PIPE
 import time
 
 import gentooimgr.configs
+from gentooimgr.process import run_cmd
 from gentooimgr.logging import LOG
 import gentooimgr.errorcodes
 DEFAULT_KERNEL_CONFIG_PATH = os.path.join(os.sep, 'etc', 'kernel', 'default.config')
 
-def kernel_copy_conf(args, config, inchroot=False):
-    """Kernel configuration is a direct copy of a full complete config file.
-    This method overrwrites the target config file, but calling from build_kernel()
-    will skip it if it exists.
-    If you need a fresh config, call it from the ``install`` action instead of ``kernel``,
-    remove it manually, or add the --force option.
+def get_kernel_config_name(args, config):
+    """Retrieve the expected name of our kernel .config equivalent file.
+        * --config-cloud = cloud
+        * --config-qemu  = qemu
+        etc.
+
+        Returns without the suffix.
     """
-    fname, ext = os.path.splitext(args.config)
-    # Default is the json file's name but with .config extension.
-    CONFIG_DIR = gentooimgr.configs.CONFIG_DIR
-    kernelconfig = os.path.join(CONFIG_DIR, config.get("kernel", {}).get("config", f"{fname}.config"))
-    if not os.path.exists(kernelconfig):
-        LOG.error(f"Expected kernel configuration file does not exist {kernelconfig}")
-    kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
-    if not inchroot:
-        # Remove leading / from kernelpath and prepend our mountpoint for a proper non-chroot path (default)
-        kernelpath = os.path.join(config.get("mountpoint", gentooimgr.config.GENTOO_MOUNT), kernelpath.lstrip(os.sep))
-    if os.path.exists(kernelpath):
-        os.remove(kernelpath)
+    kernelconf = config.get("kernel", {}).get("config") or args.config
+    if kernelconf is None:
+        return None
+    f, ext = os.path.splitext(kernelconf)  # args.config may have .json extension
+    name = os.path.basename(f)
+    return name
+
+def get_installed_kernel_config_path(args, config, inchroot):
+    """Using get_kernel_config_name(), get the installed file path to the kernel file.
+    Ex: cloud.config would be /etc/kernels/config.d/gentooimgr-cloud.config
+
+    We prepend 'gentooimgr' for explicit readability.
+    """
+    name = get_kernel_config_name(args, config)
+    kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', 'etc', 'kernels', 'config.d') if not inchroot else os.path.join(os.sep, 'etc', 'kernels', 'config.d')
+    return os.path.join(kerneldir, f'gentooimgr-{name}.config')
+
+def kernel_copy_conf(args, config, inchroot=False) -> int:
+    """Copies our *.config file into /etc/kernels/config.d/[name].config.
+    """
+    code = gentooimgr.errorcodes.PROCESS_FAILED
+    if inchroot:
+        LOG.warning("\t:: Kernel cannot copy gentooimgr config files while in chroot, lost access. This may not work")
+    if os.path.exists(gentooimgr.configs.CONFIG_DIR):
+        kernelconf = get_installed_kernel_config_path(args, config, inchroot)
+        path = os.path.dirname(kernelconf)
+        LOG.debug(f"\t:: Creating kernel configuration path {path}")
+        os.makedirs(path, exist_ok=True)
+        configfile = os.path.join(gentooimgr.configs.CONFIG_DIR, get_kernel_config_name(args, config) + ".config")
+        if os.path.exists(configfile):
+            LOG.debug(f"\t:: Config file {configfile} exists.")
+            shutil.copyfile(configfile, kernelconf)
+            code = gentooimgr.errorcodes.SUCCESS
+
+        else:
+            LOG.debug(f"\t:: Config file {configfile} does not exist!")
     else:
-        # Ensure if we have directories specified that they exist
-        os.makedirs(os.path.dirname(kernelpath), exist_ok=True)
+        LOG.error(f"{gentooimgr.configs.CONFIG_DIR} does not exist. Chroot: {inchroot}")
 
-    LOG.info(f"\t:: Copying kernel config {kernelconfig} to {kernelpath}")
-    shutil.copyfile(kernelconfig, kernelpath)
+    return code
 
-def build_kernel(args, config) -> int:
+def build_kernel(args, config, inchroot=False) -> int:
     code = gentooimgr.errorcodes.SUCCESS
     if args.kernel_dist:
         # Distribution kernel builds itself so the package step handles this.
         LOG.warning("--kernel-dist is enabled so no actual build is performed here; "
             "Running `emerge sys-kernel/gentoo-kernel-bin` will install the kernel "
             "if you want this done in its own step.")
+
         return code
 
-    os.chdir(args.kernel_dir)
-    if config.get("kernel", {}).get("config") is None:
+    kerneldir = args.kernel_dir
+    if not inchroot:
+        if kerneldir[0] == os.sep:
+            kerneldir = kerneldir[1:] # remove '/' from
+        kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', kerneldir)
+    os.chdir(kerneldir)
+    # kernel_copy_conf needs to happen before this works correctly:
+    kernelconf = get_installed_kernel_config_path(args, config, inchroot)
+    LOG.info(f"\t:: Using kernel configuration {'default' if kernelconf is None else kernelconf}")
+    if kernelconf is None:
         kernel_default_config(args, config)
-    kernelpath = config.get("kernel", {}).get("path", DEFAULT_KERNEL_CONFIG_PATH)
-    LOG.info(f"\t:: Using kernel configuration at {kernelpath}")
-    if not os.path.exists(kernelpath) or args.force:
-        kernel_copy_conf(args, config)
     # Using genkernel will save the config based on kernel version, so while we give it --kernel-config, output is /etc/kernels/kernel-[version]
     # Assume we will want --virtio in all cases
-    cmd = ['genkernel', f'--kernel-config={kernelpath}', '--save-config', '--bootdir=/boot/efi', '--no-menuconfig', '--virtio', 'all']
-    LOG.debug(' '.join(cmd))
-    proc = Popen(cmd)
-    proc.communicate()
-
-    if proc.returncode != 0:
-        LOG.warning(f"Genkernel command `{' '.join(cmd)}` failed")
-    kernel_save_config(args, config)
+    cmd = ['genkernel', f'--kernel-config={kernelconf}', '--bootdir=/boot/efi', '--no-menuconfig', '--virtio', 'all']
+    code, stdout, stderr = run_cmd(args, cmd)
+    # kernel_save_code = gentooimgr.errorcodes.PROCESS_FAILEDconfig(args, config) # Kernel config is saved with genkernel
     return code
 
 def kernel_default_config(args, config):
     code = gentooimgr.errorcodes.SUCCESS
     os.chdir(args.kernel_dir)
-    cmd = ["make", "defconfig"]
-    proc = Popen(cmd)
-    proc.communicate()
-    if proc.returncode != 0:
-        LOG.warning(f"kernel command `{' '.join(cmd)}` failed")
-        # Return proper error code, but don't necessarily exit.
-        code = gentooimgr.errorcodes.PROCESS_FAILED
+    code, stdout, stderr = run_cmd(args, ["make", "defconfig"])
+    if code != 0:
+        LOG.error(f"kernel command `make defconfig` failed")
+
+    try:
+        code, stdout, stderr = run_cmd(args, ["make", "kvm_guest.config"])
+        if code != 0:
+            LOG.error(f"kernel command `make defconfig` failed")
+    except:
+        LOG.warning("`make kvm_guest.config failed, if this is a kernel version <= 5.10, attempting make kvmconfig")
+        code, stdout, stderr = run_cmd(args, ["make", "kvmconfig"])
+        if code != 0:
+            LOG.error("kernel command `make kvmconfig` failed")
 
     return code
 
@@ -82,18 +112,16 @@ def kernel_save_config(args, config):
     code = gentooimgr.errorcodes.SUCCESS
     os.chdir(args.kernel_dir)
     """Saves the current .config file"""
-    cmd = ["make", "savedefconfig"]
-    proc = Popen(cmd)
-    proc.communicate()
-    if proc.returncode != 0:
+    code, stdout, stderr = run_cmd(args, ["make", "savedefconfig"])
+    if code != 0:
         LOG.warning(f"kernel command `{' '.join(cmd)}` failed")
         # Return proper error code, but don't necessarily exit.
         code = gentooimgr.errorcodes.PROCESS_FAILED
 
     return code
 
-GRUB_CFG = """
-# Copyright 1999-2015 Gentoo Foundation
+def gen_grub_cfg(cli, use_serial=True):
+    return f"""# Copyright 1999-2015 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 # $Header: /var/cvsroot/gentoo-x86/sys-boot/grub/files/grub.default-3,v 1.5 2015/03/25 01:58:00 floppym Exp $
 #
@@ -110,12 +138,12 @@ GRUB_DISTRIBUTOR="GentooImgr"
 #GRUB_DEFAULT=0
 
 # Boot the default entry this many seconds after the menu is displayed
-#GRUB_TIMEOUT=5
-#GRUB_TIMEOUT_STYLE=menu
+GRUB_TIMEOUT=5
+GRUB_TIMEOUT_STYLE=menu
 
 # Append parameters to the linux kernel command line
 # openrc only spits to the last console=tty
-GRUB_CMDLINE_LINUX="{}"
+GRUB_CMDLINE_LINUX="{cli}"
 #
 # Examples:
 #
@@ -129,8 +157,8 @@ GRUB_CMDLINE_LINUX="{}"
 #GRUB_CMDLINE_LINUX_DEFAULT=""
 
 # Uncomment to disable graphical terminal (grub-pc only)
-GRUB_TERMINAL="serial console"
-GRUB_SERIAL_COMMAND="serial --speed=115200"
+{'#' if not use_serial else ''} GRUB_TERMINAL="serial console"
+{'#' if not use_serial else ''} GRUB_SERIAL_COMMAND="serial --speed=115200"
 #GRUB_SERIAL_COMMAND="serial --speed=115200 --unit=0 --word=8 --parity=no --stop=1"
 
 # The resolution used on graphical terminal.

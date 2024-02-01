@@ -62,7 +62,7 @@ def main(args):
 
     elif args.action == "kernel":
         import gentooimgr.kernel
-        code = gentooimgr.kernel.build_kernel(args, configjson)
+        code = gentooimgr.kernel.build_kernel(args, configjson, inchroot=not os.path.exists("/mnt/gentoo"))
 
     return code
 
@@ -86,6 +86,8 @@ if __name__ == "__main__":
                         help="Enable EFI for the resulting gentoo image partition type. If not set, is autodetected.")
     parser.add_argument("--use-mbr", action="store_const", const="mbr", dest="parttype",
                         help="Enable MBR for the resulting gentoo image partition type If not set, is autodetected.")
+    # currently only pretends for install and maybe some kernel action. FIXME
+    parser.add_argument("--pretend", action="store_true", help="Log commands instead of running them, no chrooting")
 
     parser.add_argument("--efi-firmware", nargs="?", default=gentooimgr.config.DEFAULT_GENTOO_EFI_FIRMWARE_PATH,
                         help="Path to the EFI firmware (OVMF_CODE.fd or similar)")
@@ -112,6 +114,8 @@ if __name__ == "__main__":
                             help="Extract the specified stage3 package onto the filesystem")
     parser.add_argument("--kernel-dir", default="/usr/src/linux",
                                help="Where kernel is specified. By default uses the active linux kernel")
+    parser.add_argument("--kernel-dist", action="store_true",
+                        help="Use a distribution kernel in the installation. Overrides all other kernel options.")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
@@ -148,16 +152,17 @@ if __name__ == "__main__":
 
     parser_install = subparsers.add_parser("install", help="Install Gentoo on a qemu guest. Defaults to "
                                            "--config-base with --kernel-dist if the respective --config or --kernel options are not provided.")
-    parser_install.add_argument("--kernel-dist", action="store_true",
-                              help="Use a distribution kernel in the installation. Overrides all other kernel options.")
     parser_install.add_argument("--kernel-virtio", action="store_true", help="Include virtio support in non-dist kernels")
     parser_install.add_argument("--kernel-g5", action="store_true", help="Include all kernel config options for PowerMac G5 compatibility")
+    parser_install.add_argument("--step-prompt", action="store_true", help="If enabled, requires <enter> to be pressed after each step is complete (for debugging)")
     parser_install.add_argument("-P", "--packages", nargs="*",
                                 help="List of 'additional' packages to install on top of the current configured package list.")
     parser_install.add_argument("-S", "--services", nargs="*", help="Enable services; either specify the service name (ie: apache2) for "
                                 "a default level or service:level (ie: sshd:boot) for other levels. "
                                 "Useful if -P option specifies a package with a service to enable")
-
+    parser_install.add_argument("-I", "--ignore-collisions", nargs="+", default=None,
+                                help="Specify path to ignore collisions within. In the event that Gentoo fails to install dependencies on collision, "
+                                "set this to `-I /usr -I /etc`")
     parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit.")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
                                help="Point to mount and run the chroot and shell.")

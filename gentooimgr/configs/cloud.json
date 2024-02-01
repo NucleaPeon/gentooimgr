@@ -4,8 +4,12 @@
         "additional": [
             "app-emulation/cloud-init",
             "sys-block/open-iscsi",
-            "net-misc/ntp"
+            "net-misc/ntp",
+            "net-misc/networkmanager"
         ]
+    },
+    "usefiles": {
+        "network": ["net-misc/networkmanager -wifi -wext -bluetooth"]
     },
     "serial": true,
     "disk": "/dev/vda",
@@ -15,10 +19,16 @@
         "commandline": "net.ifnames=0 vga=791 console=tty0 console=ttyS0,115200"
     },
     "services": {
-        "cloud-init-local": "default",
+        "cloud-init-local": "boot",
         "cloud-init": "default",
         "cloud-config": "default",
         "cloud-final": "default",
-        "ntpd": "default"
+        "net.lo": "default",
+        "net.eth0": "default",
+        "ntpd": "default",
+        "NetworkManager": "default"
+    },
+    "passwords": {
+        "root": "root"
     }
 }

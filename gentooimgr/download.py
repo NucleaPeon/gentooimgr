@@ -15,6 +15,7 @@ import progressbar
 from urllib.request import urlretrieve
 import tempfile
 import gentooimgr.config as config
+from gentooimgr.logging import LOG
 from gentooimgr.common import older_than_a_day
 
 hashpattern =    re.compile(config.GENTOO_FILE_HASH_RE, re.MULTILINE)
@@ -88,7 +89,10 @@ def verify(args, _type: str, baseurl: str, hashpattern, filename: str) -> bool:
         content = f.read()
         m_hash = hashpattern.search(content)
         _hash = m_hash.group(1)
-        assert hd == _hash, f"Hash mismatch {hd} != {_hash}"
+        if _hash != hd and args.force:
+            LOG.error(f"Hash mismatch {hd} != {_hash} for {filename}")
+        else:
+            assert hd == _hash, f"Hash mismatch {hd} != {_hash}, use --force to bypass"
 
 def download_stage3(args, url=None) -> str:
     if url is None:

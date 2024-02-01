@@ -8,13 +8,14 @@ import os
 import sys
 import shutil
 import configparser
-from subprocess import Popen, PIPE
+from subprocess import PIPE
 import gentooimgr.config
 import gentooimgr.configs
 import gentooimgr.common
 import gentooimgr.chroot
 import gentooimgr.kernel
 import gentooimgr.errorcodes
+from gentooimgr.process import run_cmd
 from gentooimgr import HERE
 from gentooimgr.logging import LOG
 
@@ -51,11 +52,9 @@ def step1_diskprep(args, cfg):
         cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
 
     for c in cmds:
-        LOG.debug(' '.join(c))
-        proc = Popen(c, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = proc.communicate()
+        run_cmd(args, c, stdout=PIPE, stderr=PIPE)
 
-    completestep(1, "diskprep")
+    completestep(args, 1, "diskprep")
 
 def step2_mount(args, cfg):
     LOG.info(f":: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}")
@@ -73,10 +72,8 @@ def step2_mount(args, cfg):
         cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
 
     for c in cmd:
-        LOG.debug(' '.join(c))
-        proc = Popen(c)
-        proc.communicate()
-    completestep(2, "mount")
+        run_cmd(args, c, stdout=PIPE, stderr=PIPE)
+    completestep(args, 2, "mount")
 
 def step3_stage3(args, cfg):
     LOG.info(f":: Step 3: Stage3 Tarball")
@@ -87,15 +84,13 @@ def step3_stage3(args, cfg):
     LOG.info(f"\t:: Stage 3 file selected: {stage3}")
     cmd = ["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
                   f'{cfg.get("mountpoint")}']
-    LOG.debug(' '.join(cmd))
-    proc = Popen(cmd)
-    proc.communicate()
-    completestep(3, "stage3")
+    run_cmd(args, cmd)
+    completestep(args, 3, "stage3")
 
 def step4_binds(args, cfg):
     LOG.info(':: Step 4: Binding Filesystems')
-    gentooimgr.chroot.bind(verbose=args.debug)
-    completestep(4, "binds")
+    if not args.pretend: gentooimgr.chroot.bind(verbose=args.debug)
+    completestep(args, 4, "binds")
 
 def step5_portage(args, cfg):
     LOG.info(':: Step 5: Portage')
@@ -105,10 +100,7 @@ def step5_portage(args, cfg):
 
     portage = str(portage)  # --portage = posixpath, not str
     LOG.info(f"\t:: Portage file selected: {portage}")
-    cmd = ["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"]
-    LOG.debug(" ".join(cmd))
-    proc = Popen(cmd)
-    proc.communicate()
+    run_cmd(args, ["tar", "xpf", portage, "-C", f"{cfg.get('mountpoint')}/usr/"])
     # Edit portage
     portage_env = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'env')
     os.makedirs(portage_env, exist_ok=True)
@@ -121,7 +113,7 @@ def step5_portage(args, cfg):
         f.write("app-portage/eix singlejob.conf\ndev-util/maturin singlejob.conf\ndev-util/cmake singlejob.conf")
     LOG.info("\t:: Portage package environment configuration file written")
 
-    completestep(5, "portage")
+    completestep(args, 5, "portage")
 
 def step6_licenses(args, cfg):
     LOG.info(':: Step 6: Licenses')
@@ -131,125 +123,125 @@ def step6_licenses(args, cfg):
         LOG.info(f"\t:: Writing {f} license file")
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
-    completestep(6, "license")
+    completestep(args, 6, "license")
 
 def step7_repos(args, cfg):
     LOG.info(':: Step 7: Repo Configuration')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
-    os.makedirs(repo_path, exist_ok=True)
+    if not args.pretend: os.makedirs(repo_path, exist_ok=True)
     # Copy from template
     repo_file = os.path.join(repo_path, 'gentoo.conf')
-    shutil.copyfile(
+    if not args.pretend: shutil.copyfile(
         os.path.join(cfg.get("mountpoint"), 'usr', 'share', 'portage', 'config', 'repos.conf'),
         repo_file)
     LOG.info(f"\t:: Repo configuration file copied {repo_file}")
     # Regex replace lines
-    cp = configparser.ConfigParser()
-    for repofile, data in cfg.get("repos", {}).items():
-        cp.read(cfg.get("mountpoint") + repofile)  # repofile should be absolute path, do not use os.path.join.
-        for section, d in data.items():
-            if section in cp:
-                for key, val in d.items():
-                    # Replace everything after the key with contents of value.
-                    # Sed is simpler than using regex for this purpose.
-                    cp.set(section, key, val)
-            else:
-                LOG.warning(f"\tWW No section {section} in {repofile}\n")
+    if not args.pretend:
+        cp = configparser.ConfigParser()
+        for repofile, data in cfg.get("repos", {}).items():
+            cp.read(cfg.get("mountpoint") + repofile)  # repofile should be absolute path, do not use os.path.join.
+            for section, d in data.items():
+                if section in cp:
+                    for key, val in d.items():
+                        # Replace everything after the key with contents of value.
+                        # Sed is simpler than using regex for this purpose.
+                        cp.set(section, key, val)
+                else:
+                    LOG.warning(f"\tWW No section {section} in {repofile}\n")
 
-        cp.write(open(cfg.get("mountpoint") + repofile, 'w'))
+            cp.write(open(cfg.get("mountpoint") + repofile, 'w'))
 
-    completestep(7, "repos")
+    completestep(args, 7, "repos")
 
 def step8_resolv(args, cfg):
     LOG.info(f':: Step 8: Resolv')
     if not os.path.exists(cfg.get("mountpoint")):
         return
-    proc = Popen(["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
-    proc.communicate()
+    run_cmd(args, ["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
     # Copy all step files and python module to new chroot
-    os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
-    os.system(f"cp -r . {cfg.get('mountpoint')}/mnt/")
-    completestep(8, "resolv")
+    if not args.pretend:
+        os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
+        os.system(f"cp -r . {cfg.get('mountpoint')}/mnt/")
+    completestep(args, 8, "resolv")
 
 def step9_sync(args, cfg):
     LOG.info(f":: Step 9: sync")
     os.chdir(os.sep)
+    env = os.environ
+    if args.ignore_collisions:
+        os.environ['COLLISION_IGNORE'] = f"{' '.join(args.ignore_collisions)}"
     os.system("source /etc/profile")
-    proc = Popen(["emerge", "--sync", "--quiet"])
-    proc.communicate()
+    run_cmd(args, ["emerge", "--sync", "--quiet"])
     LOG.debug("\t:: Sync'd")
     LOG.info("\t:: Emerging base")
-    proc = Popen(["emerge", "--update", "--deep", "--newuse", "--keep-going", "@world"])
-    proc.communicate()
+    run_cmd(args, ["emerge", "--update", "--deep", "--newuse", "--keep-going", "@world"], env=env)
     LOG.debug("\t:: World Emerged")
-    completestep(9, "sync")
+    completestep(args, 9, "sync")
 
 def step10_emerge_pkgs(args, cfg):
     LOG.info(f":: Step 10: emerge pkgs")
     packages = cfg.get("packages", {})
+    env = os.environ
+    if args.ignore_collisions:
+        os.environ['COLLISION_IGNORE'] = ' '.join(args.ignore_collisions)
     for one in packages.get("oneshots", []):
-        proc = Popen(["emerge", "--oneshot", one])
-        proc.communicate()
+        LOG.debug(f"\t:: Oneshot packages: {one}")
+        run_cmd(args, ["emerge", "--oneshot", one])
 
     for single in packages.get("singles", []):
-        proc = Popen(["emerge", "-j1", single])
-        proc.communicate()
+        LOG.debug(f"\t:: Single packages: {single}")
+        run_cmd(args, ["emerge", "-j", "1", single], env=env)
 
-    LOG.debug(f"KERNEL PACKAGES {' '.join(packages.get('kernel')) }")
     if packages.get("kernel", []):
-        cmd = ["emerge", "-j", str(args.threads)] + packages.get("kernel", [])
-        proc = Popen(cmd)
-        proc.communicate()
+        run_cmd(args, ["emerge", "-j", str(args.threads)] + packages.get("kernel", []), env=env)
 
     cmd = ["emerge", "-j", str(args.threads), "--keep-going"]
     cmd += packages.get("keepgoing", [])
-    proc = Popen(cmd)
-    proc.communicate()
-
-
-    if args.parttype == "efi":
+    run_cmd(args, cmd, env=env)
+    if args.parttype == "efi" and not args.pretend:
         LOG.info(":: Setting GRUB_PLATFORMS in make.conf")
         with open('/etc/portage/make.conf', 'a') as make_conf:
             make_conf.write("GRUB_PLATFORMS=\"efi-64\"\n")
 
-
+    cmd = ["emerge", "-j", str(args.threads)]
+    cmd += packages.get("bootloader", ['sys-boot/grub:2'])
+    run_cmd(args, cmd, env=env)
+    LOG.info("\t:: Installing {}".format(packages.get("bootloader")))
     cmd = ["emerge", "-j", str(args.threads)]
     cmd += packages.get("base", [])
     cmd += packages.get("additional", [])
-    cmd += packages.get("bootloader", [])
     cmd += args.packages or []
-    LOG.info(f"\t:: Emerging package list command {' '.join(cmd)}")
-    proc = Popen(cmd)
-    proc.communicate()
+    run_cmd(args, cmd, env=env)
     try:
-        proc = Popen(["eix-update"])
-        proc.communicate()
+        run_cmd(args, ["eix-update"], env=env)
         LOG.debug("\t:: eix Updated")
     except Exception as E:
         # eix is assumed to be installed based on our base.json package, but custom configs may not have it.
         # That means this is non-essential to occur.
         LOG.warning("eix-update failed to run, is eix installed?")
-    completestep(10, "pkgs")
+    completestep(args, 10, "pkgs")
 
 def step11_kernel(args, cfg):
     # at this point, genkernel will be installed. Please note that configuration files must be copied before this point
     LOG.info(f":: Step 11: kernel")
-    proc = Popen(["eselect", "kernel", "set", "1"])
-    proc.communicate()
-    if not args.kernel_dist:
-        threads = str(gentooimgr.config.THREADS)
-        gentooimgr.kernel.build_kernel(args, cfg)
+    run_cmd(args, ["eselect", "kernel", "set", "1"])
+    if not args.kernel_dist and not args.pretend:
+        gentooimgr.kernel.build_kernel(args, cfg, inchroot=not os.path.exists('/mnt/gentoo'))
 
-    if args.parttype == "efi":
+    if args.parttype == "efi" and not args.pretend:
         # We need to copy the /boot/efi/{vmlinuz/System/initramfs files to /boot
         path = "/boot/efi"
         copyfiles = os.listdir(path)
         for f in copyfiles:
             if f.startswith("vmlinuz") or f.startswith("initramfs") or f.startswith("System"):
-                shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
-                LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
+                if args.pretend:
+                    LOG.info(f"copy {os.path.join(path, f)} {os.path.join(os.sep, 'boot', f)}")
 
-    completestep(11, "kernel")
+                else:
+                    shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
+                    LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
+
+    completestep(args, 11, "kernel")
 
 def step12_grub(args, cfg):
     LOG.info(f":: Step 12: kernel")
@@ -257,24 +249,20 @@ def step12_grub(args, cfg):
     if args.parttype == "efi":
         cmd += ["--target=x86_64-efi", '--efi-directory=/boot/efi']
     cmd.append(cfg.get('disk'))
-
-    proc = Popen(cmd)
-    proc.communicate()
-    code = proc.returncode
+    code, out, err = run_cmd(args, cmd, stderr=PIPE)
+    code, out, err = run_cmd(args, ["eselect", "kernel", "set", "1"], stderr=PIPE, stdout=PIPE)
     if code != 0:
-        sys.stderr.write(f"Failed to install grub on {cfg.get('disk')}\n")
         sys.exit(code)
 
     grubcli = cfg.get("kernel", {}).get("commandline", "")
-    if grubcli:
+    if grubcli and not args.pretend:
         with open("/etc/default/grub", 'w') as f:
-            grubtxt = gentooimgr.kernel.GRUB_CFG.format(grubcli)
+            grubtxt = gentooimgr.kernel.gen_grub_cfg(grubcli)
             f.write(f"{grubtxt}")
 
-    proc = Popen(["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
-    proc.communicate()
+    run_cmd(args, ["grub-mkconfig", "-o", "/boot/grub/grub.cfg"])
     # if using efi, copy resulting grubx64.efi to bootx64.efi
-    if args.parttype == "efi":
+    if args.parttype == "efi" and not args.pretend:
         shutil.copyfile("/boot/efi/EFI/gentoo/grubx64.efi", "/boot/efi/EFI/BOOT/bootx64.efi")
         # copy efi files to refind directory
         bootdir = "/boot"
@@ -284,52 +272,53 @@ def step12_grub(args, cfg):
             shutil.copyfile(os.path.join(bootdir, f),
                             os.path.join(bootdir, "efi", 'EFI', 'gentoo', f))
 
-    completestep(12, "grub")
+    completestep(args, 12, "grub")
 
 def step13_serial(args, cfg):
     LOG.info(f":: Step 13: Serial")
-    if cfg.get("serial"):
+    if cfg.get("serial") and not args.pretend:
         os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
         os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
-    completestep(13, "serial")
+    completestep(args, 13, "serial")
 
-def step14_services(args, cfg):
+def step14_networking(args, cfg):
     LOG.info(f":: Step 14: Services")
+    os.chdir('/etc/init.d')
+    os.symlink('net.lo', 'net.eth0')
+    # link /etc/init.d/net.lo ->/etc/init.d/net.eth0
+    os.symlink('/dev/null', '/etc/udev/rules.d/70-persistent-net.rules')
+    os.symlink('/dev/null', '/etc/udev/rules.d/80-net-setup-link.rules')
+    completestep(args, 14, "networking")
+
+def step15_services(args, cfg):
+    LOG.info(f":: Step 15: Services")
     services = args.services or []
     services += cfg.get("services", [])
     for service in services:
         if args.profile == "systemd":
-            proc = Popen(["systemctl", "enable", service])
+            run_cmd(args, ["systemctl", "enable", service])
         else:
-            proc = Popen(["rc-update", "add", service, "default"])
-        proc.communicate()
-
-    completestep(14, "services")
-
-def step15_ethnaming(args, cfg):
-    LOG.info(f":: Step 15: Eth Naming")
-    completestep(15, "networking")
+            run_cmd(args, ["rc-update", "add", service, "default"])
+    completestep(args, 15, "services")
 
 def step16_sysconfig(args, cfg):
     LOG.info(f":: Step 16: Sysconfig")
-    with open("/etc/timezone", "w") as f:
-        f.write("UTC")
-    proc = Popen(["emerge", "--config", "sys-libs/timezone-data"])
-    proc.communicate()
-    with open("/etc/locale.gen", "a") as f:
-        f.write("en_US.UTF-8 UTF-8\nen_US ISO-8859-1\n")
-    proc = Popen(["locale-gen"])
-    proc.communicate()
-    proc = Popen(["eselect", "locale", "set", "en_US.utf8"])
-    proc.communicate()
-    proc = Popen(["env-update"])
-    proc.communicate()
-    with open('/etc/sysctl.d/swappiness.conf', 'w') as f:
-        f.write("vm.swappiness = 0\n")
+    if not args.pretend:
+        with open("/etc/timezone", "w") as f:
+            f.write("UTC")
+        with open("/etc/locale.gen", "a") as f:
+            f.write("en_US.UTF-8 UTF-8\nen_US ISO-8859-1\n")
+        with open('/etc/sysctl.d/swappiness.conf', 'w') as f:
+            f.write("vm.swappiness = 0\n")
 
+    run_cmd(args, ["emerge", "--config", "sys-libs/timezone-data"])
+    run_cmd(args, ["locale-gen"])
+    run_cmd(args, ["eselect", "locale", "set", "en_US.utf8"])
+    run_cmd(args, ["env-update"])
     modloadpath = os.path.join(os.sep, 'etc', 'modules-load.d')
-    os.makedirs(modloadpath, exist_ok=True)
-    if args.config == "cloud" or args.force_cloud:
+    if not args.pretend:
+        os.makedirs(modloadpath, exist_ok=True)
+    if not args.pretend and args.config == "cloud.json" or args.force_cloud:
         # Maybe there's a better way to do this than a hardcoded check within the install process.
         with open(os.path.join(modloadpath, 'cloud-modules.conf'), 'w') as f:
             f.write('\n'.join(gentooimgr.config.CLOUD_MODULES))
@@ -348,29 +337,28 @@ def step16_sysconfig(args, cfg):
 
         os.chmod(os.path.join(cloudcfg, "templates", "hosts.gentoo.tmpl"), 0o644)
 
-    proc = Popen("sed -i 's/domain_name\,\ domain_search\,\ host_name/domain_search/g' /etc/dhcpcd.conf", shell=True)
-    proc.communicate()
+    if not args.pretend:
+        os.system("sed -i 's/domain_name\,\ domain_search\,\ host_name/domain_search/g' /etc/dhcpcd.conf")
+        hostname = os.path.join(os.sep, 'etc', 'conf.d', 'hostname')
+        with open(hostname, 'w') as f:
+            f.write(f"{HOSTNAME}\n")
 
-    hostname = os.path.join(os.sep, 'etc', 'conf.d', 'hostname')
-    with open(hostname, 'w') as f:
-        f.write(f"{HOSTNAME}\n")
+        os.chmod(hostname, 0o644)
+        os.remove(os.path.join(os.sep, 'etc', 'resolv.conf'))
 
-    os.chmod(hostname, 0o644)
-
-    os.remove(os.path.join(os.sep, 'etc', 'resolv.conf'))
-
-    completestep(16, "sysconfig")
+    completestep(args, 16, "sysconfig")
 
 def step17_fstab(args, cfg):
     LOG.info(f":: Step 17: fstab")
     partition = 1
-    with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
-        if args.parttype == "efi":
-            fstab.write(f"{cfg.get('disk')}{partition}\t/boot\tvfat\tnoatime\t1 2\n")
-            partition += 1
-        fstab.write(f"{cfg.get('disk')}{partition}\t/\text4\tdefaults,noatime\t0 1\n")
+    if not args.pretend:
+        with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
+            if args.parttype == "efi":
+                fstab.write(f"{cfg.get('disk')}{partition}\t/boot\tvfat\tnoatime\t1 2\n")
+                partition += 1
+            fstab.write(f"{cfg.get('disk')}{partition}\t/\text4\tdefaults,noatime\t0 1\n")
 
-    completestep(17, "fstab")
+    completestep(args, 17, "fstab")
 
 def step18_passwd(args, cfg):
     """Keep in mind that users that do not exist but have passwords may silently fail.
@@ -378,15 +366,15 @@ def step18_passwd(args, cfg):
     """
     LOG.info(f":: Step 18: Setting Root Password")
     passwords = cfg.get("passwords", {})
-    if passwords:
+    if passwords and not args.pretend:
         shutil.copyfile("/etc/shadow", "/root/shadow.bak")
         # https://wiki.gentoo.org/wiki/Setting_a_default_root_password
         cmd = """sed -i 's/{user}:\*/{user}\:{passwdhash}/' /etc/shadow"""
         for user, passwd in passwords.items():
-            proc = Popen(["openssl", "passwd", "-6", passwd], stdout=PIPE, stderr=PIPE)
-            stdout, stderr = proc.communicate()
+            code, stdout, stderr = run_cmd(args, ["openssl", "passwd", "-6", passwd], stdout=PIPE, stderr=PIPE)
+
             if stderr:
-                LOG.error(f"\t:: Password change for {user} contained error with return code {proc.returncode}.")
+                LOG.error(f"\t:: Password change for {user} contained error with return code {code}.")
                 continue  # do not attempt to store a hash that fails
 
             passwdhash = stdout.strip()
@@ -405,9 +393,13 @@ def step18_passwd(args, cfg):
             with open('/etc/shadow', 'w') as f:
                 f.write(''.join(wholefile))  # Write it all out
 
-    completestep(18, "passwords")
+    completestep(args, 18, "passwords")
 
-def completestep(step, stepname, prefix='/tmp'):
+def completestep(args, step, stepname, prefix='/tmp'):
+    if args.step_prompt:
+        input("Step Prompt: Press <Enter> to continue")
+    if args.pretend:
+        return
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
         f.write("done.")  # text in this file is not currently used.
     LOG.info(f":: Step {step} {stepname} complete")
@@ -437,7 +429,7 @@ def prechroot(args, cfg):
     appropriate places
     """
     LOG.info("\t::Doing some pre-chroot work")
-    gentooimgr.kernel.kernel_copy_conf(args, cfg)
+    gentooimgr.kernel.kernel_copy_conf(args, cfg, not os.path.exists('/mnt/gentoo'))
     exists = os.path.exists(cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH))
     LOG.info(f"\t::Kernel configuration exists: {exists}")
 
@@ -469,8 +461,8 @@ def configure(args, config: dict) -> int:
     # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
     if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
         LOG.info(":: Binding and Mounting, Entering CHROOT")
-        if not os.path.exists('/mnt/gentoo') and args.force:
-            LOG.info(":: Using --force, no /mnt/gentoo found so skipping chroot")
+        if not os.path.exists('/mnt/gentoo') and args.force or args.pretend:
+            LOG.info(":: Using --force or --pretend, no /mnt/gentoo found so skipping chroot")
 
         else:
             prechroot(args, cfg)
@@ -491,11 +483,11 @@ def configure(args, config: dict) -> int:
     if not stepdone(12): step12_grub(args, cfg)
     # enable serial console
     if not stepdone(13): step13_serial(args, cfg)
-    # services
-    if not stepdone(14): step14_services(args, cfg)
     # eth0 naming
+    if not stepdone(14): step14_networking(args, cfg)
     # timezone
-    if not stepdone(15): step15_ethnaming(args, cfg)
+    # services
+    if not stepdone(15): step15_services(args, cfg)
     # locale
     # set some sysctl things
     # set some dhcp things
@@ -505,7 +497,7 @@ def configure(args, config: dict) -> int:
     if not stepdone(17): step17_fstab(args, cfg)
     if not stepdone(18): step18_passwd(args, cfg)
     # copy cloud cfg?
-    gentooimgr.chroot.unbind()
+    if not args.pretend: gentooimgr.chroot.unbind()
     # Finish install processes like emaint and eix-update and news read
     return gentooimgr.errorcodes.SUCCESS
 
