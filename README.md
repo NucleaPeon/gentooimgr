@@ -15,6 +15,9 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 * Step system to enable user to continue off at the same place if a step fails
 * No heavy packages like rust included ** Cloud Init images do require rust, QEMU-only doesn't. (TODO)
 
+
+**IMPORTANT**: Gentoo with EFI and Cloud-Init configuration is buggy: https://github.com/canonical/cloud-init/issues/3999
+
 ## Preface
 
 This project was created so I could spawn off Gentoo OS templates on my Proxmox server for various services while being more efficient than many other Linux OS's and avoiding systemd.
@@ -61,7 +64,7 @@ cd /mnt/gi
 python -m gentooimgr --config-cloud install
 python -m gentooimgr unchroot
 ```
-
+networkmanager
 ### Using EFI
 
 This is slightly more complicated.
