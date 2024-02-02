@@ -4,12 +4,8 @@
         "additional": [
             "app-emulation/cloud-init",
             "sys-block/open-iscsi",
-            "net-misc/ntp",
-            "net-misc/networkmanager"
+            "net-misc/ntp"
         ]
-    },
-    "usefiles": {
-        "network": ["net-misc/networkmanager -wifi -wext -bluetooth"]
     },
     "serial": true,
     "disk": "/dev/vda",
@@ -25,8 +21,7 @@
         "cloud-final": "default",
         "net.lo": "default",
         "net.eth0": "default",
-        "ntpd": "default",
-        "NetworkManager": "default"
+        "ntpd": "default"
     },
     "passwords": {
         "root": "root"
