@@ -44,7 +44,7 @@ Thanks!
 * [ ] Internet Connection
 * [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional)
 * [ ] OVMF firmware for using EFI enabled images (optional)
-
+* [ ] progressbar for python (dev-python/progressbar2 package if running on gentoo)
 
 
 ## Quick Start
