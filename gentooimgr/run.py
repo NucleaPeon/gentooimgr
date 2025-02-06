@@ -6,11 +6,12 @@ import gentooimgr.common
 import gentooimgr.errorcodes
 from gentooimgr.logging import LOG
 
-def run(args, config: dict) -> int:
+def run(args, config: dict, **kwargs) -> int:
     mounts = args.mounts
     image = config.get("imagename") or args.image
     auto_livecd = image is None and args.iso is None or args.use_live_cd
     code = gentooimgr.errorcodes.SUCCESS
+    qemu_prog = config.get("qemu_prog")
     if image is None:
         image, code = gentooimgr.qemu.create_image(args, config, args.force)
 

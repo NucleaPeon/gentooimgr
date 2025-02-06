@@ -5,6 +5,7 @@ import argparse
 from subprocess import Popen, PIPE
 import gentooimgr.config
 import gentooimgr.common
+import gentooimgr.config
 import gentooimgr.errorcodes
 from gentooimgr.logging import LOG
 
@@ -77,7 +78,7 @@ def run_image(
 
     threads = args.threads
     cmd = [
-        "qemu-system-x86_64",
+        config.get("qemu_prog", gentooimgr.config.DEFAULT_QEMU_CMD),
         "-enable-kvm",
         "-m", str(config.get("memory", 2048)),
         "-smp", str(threads),

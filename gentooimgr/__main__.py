@@ -80,6 +80,10 @@ if __name__ == "__main__":
                         help="Use a plain qemu configuration")
     parser.add_argument("--config-base", action="store_const", const="base.json", dest="config",
                         help="Use a minimal base Gentoo configuration")
+    parser.add_argument("--config-g5-32", action="store_const", const="powerpc32.json", dest="config",
+                        help="Use a 32-bit PowerPC G5-compatible qemu configuration")
+    parser.add_argument("--config-g5-64", action="store_const", const="powerpc64.json", dest="config",
+                        help="Use a 64-bit PowerPC G5-compatible qemu configuration")
     parser.add_argument("-y", "--days", type=int, default=gentooimgr.config.DAYS,
                         help="Number of days before the files are redownloaded")
     parser.add_argument("--use-efi", action="store_const", const="efi", dest="parttype",
