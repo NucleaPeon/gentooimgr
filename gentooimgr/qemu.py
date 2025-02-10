@@ -79,19 +79,26 @@ def run_image(
     threads = args.threads
     cmd = [
         config.get("qemu_prog", gentooimgr.config.DEFAULT_QEMU_CMD),
-        "-enable-kvm",
+        "-enable-kvm" if config.get("enable_kvm", False) else "",
         "-m", str(config.get("memory", 2048)),
         "-smp", str(threads),
         "-drive", f"file={image},if=virtio,index=0,format={ext}",
         "-net", "nic,model=virtio",
         "-net", "user",
-        "-vga", "virtio",
         "-cpu", "kvm64",
         "-chardev", "file,id=charserial0,path=gentoo.log",
         "-device", "isa-serial,chardev=charserial0,id=serial0",
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
+    LOG.info("{}".format(config))
+    if config.get("vga"):
+        cmd += ["-vga", config.get("vga")]
+    if config.get("machine"):
+        LOG.info("Setting machine to {}".format(config.get("machine")))
+        cmd += ["-M", config.get("machine")]
+    if config.get("bios"):
+        cmd += ["-L", config.get("bios")]
     if iso:
         cmd += ["-drive", f"file={iso},format=raw", "-boot", "d"]  # Boot the first CD-ROM
     else:

@@ -110,6 +110,12 @@ def determine_config(args: argparse.Namespace) -> dict:
             new_packages = configuration.get("packages", {})
             old_packages = inherited.get("packages", {})
             inherited.update(configuration)
+            # This will update your configuration with any keys in the inherited file that doesn't exist.
+            # It will not override them as you will probably want the upper-most value.
+            for ikey, ival in inherited.items():
+                if ikey not in configuration:
+                    configuration[ikey] = ival
+
             # Set back old package dict and then update only what is set in new:
             inherited['packages'] = old_packages
             for key, pkgs in new_packages.items():

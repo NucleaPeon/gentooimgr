@@ -3,7 +3,8 @@
     "imgsize": "20G",
     "memory": 4096,
     "enable_kvm": true,
-    "vga": "virtio",
+    "bios": "pc-bios",
+    "machine": "mac99,via=pmu",
     "mountpoint": "/mnt/gentoo",
     "imagename": null,
     "initsys": "openrc",
@@ -22,7 +23,6 @@
     },
     "packages": {
         "base": [
-            "acpid",
             "dmidecode",
             "syslog-ng",
             "dhcpcd",
@@ -45,7 +45,8 @@
             "gptfdisk",
             "sys-block/gpart",
             "net-fs/nfs-utils",
-            "linux-firmware"
+            "linux-firmware",
+            "sys-fs/hfsutils"
         ],
         "additional": [
             "app-editors/vim"
@@ -72,7 +73,6 @@
     "services": {
         "sshd": "default",
         "syslog-ng": "default",
-        "acpid": "default",
         "nfsclient": "default"
     },
     "iso": null,

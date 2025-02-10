@@ -2,6 +2,7 @@
     "inherit": null,
     "imgsize": "12G",
     "memory": 4096,
+    "enable_kvm": true,
     "mountpoint": "/mnt/gentoo",
     "imagename": null,
     "initsys": "openrc",

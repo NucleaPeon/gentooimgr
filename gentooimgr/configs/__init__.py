@@ -8,7 +8,10 @@ __all__ = ["CONFIG_DIR", "CLOUD_YAML", "HOST_TMPL", "HOSTNAME", "KNOWN_CONFIGS"]
 KNOWN_CONFIGS = [
     "base",
     "cloud",
-    "qemu"
+    "qemu",
+    "ppcbase",
+    "powerpc32",
+    "powerpc64"
 ]
 
 # Currently we handle the writing of additional files by having data defined here and checking options.
