@@ -15,7 +15,6 @@ def main(args):
     '''Gentoo Cloud Image Builder Utility'''
     import gentooimgr.config
     configjson = gentooimgr.config.determine_config(args)
-    print(configjson)
     code = gentooimgr.errorcodes.SUCCESS
     LOG = gentooimgr.logging.LOG
 

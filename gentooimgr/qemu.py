@@ -91,11 +91,9 @@ def run_image(
         "-chardev", "pty,id=charserial1",
         "-device", "isa-serial,chardev=charserial1,id=serial1"
     ]
-    LOG.info("{}".format(config))
     if config.get("vga"):
         cmd += ["-vga", config.get("vga")]
     if config.get("machine"):
-        LOG.info("Setting machine to {}".format(config.get("machine")))
         cmd += ["-M", config.get("machine")]
     if config.get("bios"):
         cmd += ["-L", config.get("bios")]
