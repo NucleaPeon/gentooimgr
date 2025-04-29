@@ -13,16 +13,17 @@ import gentooimgr.config
 import gentooimgr.configs
 import gentooimgr.common
 import gentooimgr.chroot
+import gentooimgr.download
 import gentooimgr.kernel
 import gentooimgr.errorcodes
-from gentooimgr.process import run_cmd
+import gentooimgr.newworld
+from gentooimgr.process import run_cmd, run
 from gentooimgr import HERE
 from gentooimgr.logging import LOG
 
 from gentooimgr.configs import *
 
 FILES_DIR = os.path.join(HERE, "..")
-LAST_STEP = 18
 
 STEPS = {
     1: "Disk Preparation",
@@ -45,45 +46,55 @@ STEPS = {
     18: "Setting Passwords"
 }
 
+LAST_STEP = max(STEPS.keys())
 
 def step1_diskprep(args, cfg):
     LOG.info(f":: Step 1: {STEPS[1]}")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = []
-    partnum = 1
+    partnum = cfg.get("partition_start", 1)
     if args.new_world_mac:
         # do a completely different partitioning process
-        LOG.debug("Setting up New World Mac partitioning scheme")
+        LOG.info("Setting up New World Mac partitioning scheme")
         # Detect if fdisk-mac exists
-        code, o, e = run_cmd(["mac-fdisk", "-l"])
+        code, o, e = run(["mac-fdisk", "-l"])
         if code != 0:
             LOG.error("mac-fdisk program not found, cannot continue")
             return
 
-#         cmds.extend([
-#
-#         ])
-    elif args.parttype == "efi":
+        if not args.pretend:
+            gentooimgr.newworld.write_partition(cfg.get("disk"))
+
         cmds.extend([
-            ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
-            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
+            ['mkfs.ext2', f'{cfg.get("disk")}{partnum}'],
+            ['mkswap', f'{cfg.get("disk")}{partnum+1}'],
+            ['echo', '\"Creating the ext4 filesystem may take a long time...\"'],
+            ['mkfs.ext4', f'{cfg.get("disk")}{partnum+2}']
         ])
-        partnum += 1
 
     else:
-        cmds.append(['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "msdos"])
+        if args.parttype == "efi":
+            cmds.extend([
+                ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
+                ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
+                ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on'],
+                ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
+            ])
+            partnum += 1
 
-    cmds.extend([
-        ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '321MiB', '100%'], # is 2048s correct?
-        ['partprobe'],
-        ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{partnum}']
-    ])
-    partnum += 1  # in case we use this later, reflect partition number to use next.
-    if args.parttype == "efi":
-        cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
+        else:
+            cmds.append(['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "msdos"])
+
+        cmds.extend([
+            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '321MiB', '100%'], # is 2048s correct?
+            ['partprobe'],
+            # -FF forces even if mounted, dangerous.
+            ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{partnum}']
+        ])
+        partnum += 1  # in case we use this later, reflect partition number to use next.
+        if args.parttype == "efi":
+            cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
 
     for c in cmds:
         run_cmd(args, c, stdout=PIPE, stderr=PIPE)
@@ -93,9 +104,9 @@ def step1_diskprep(args, cfg):
 def step2_mount(args, cfg):
     LOG.info(f":: Step 2: {STEPS[2]} {gentooimgr.config.GENTOO_MOUNT}")
 
-    partnum = 1
     cmd = []
-    if args.parttype == "efi":
+    partnum = cfg.get("partition_start")
+    if args.parttype == "efi" and not args.new_world_mac:
         cmd.extend([
             ["mount", f'{cfg.get("disk")}{partnum+1}', f"{cfg.get('mountpoint')}"],
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi"],
@@ -103,6 +114,8 @@ def step2_mount(args, cfg):
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi/EFI/BOOT/"]
         ])
     else:
+        if args.new_world_mac:
+            partnum = partnum + 2  # /dev/sda3 is boot/start of partition, /dev/sda5 is rootfs
         cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
 
     for c in cmd:
@@ -111,11 +124,14 @@ def step2_mount(args, cfg):
 
 def step3_stage3(args, cfg):
     LOG.info(f":: Step 3: {STEPS[3]}")
+    if args.install_only:
+        # download stage3 to FILES_DIR
+        gentooimgr.download.download_stage3(args, cfg=cfg)
     stage3 = cfg.get("stage3") or args.stage3  # FIXME: auto detect stage3 images in mountpoint and add here
     if not stage3:
         stage3 = gentooimgr.common.stage3_from_dir(FILES_DIR)
 
-    LOG.info(f"\t:: Stage 3 file selected: {stage3}")
+    LOG.info(f":: Stage 3 file selected: {stage3}")
     cmd = ["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
                   f'{cfg.get("mountpoint")}']
     run_cmd(args, cmd)
@@ -128,6 +144,9 @@ def step4_binds(args, cfg):
 
 def step5_portage(args, cfg):
     LOG.info(f':: Step 5: {STEPS[5]}')
+    if args.install_only:
+        # download stage3 to FILES_DIR
+        gentooimgr.download.download_portage(args, cfg=cfg)
     portage = cfg.get("portage") or args.portage
     if not portage:
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
@@ -157,6 +176,7 @@ def step6_licenses(args, cfg):
         LOG.info(f"\t:: Writing {f} license file")
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
+            f.write("\n")
     completestep(args, 6, "license")
 
 def step7_repos(args, cfg):
@@ -430,8 +450,6 @@ def step18_passwd(args, cfg):
     completestep(args, 18, "passwords")
 
 def completestep(args, step, stepname, prefix='/tmp'):
-    if args.step_prompt:
-        input("Step Prompt: Press <Enter> to continue")
     if args.pretend:
         return
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:

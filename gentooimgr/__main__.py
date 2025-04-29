@@ -9,7 +9,7 @@ import gentooimgr.config
 import gentooimgr.configs
 import gentooimgr.errorcodes
 import gentooimgr.logging
-from gentooimgr.install import STEPS
+from gentooimgr.install import STEPS, LAST_STEP
 
 def main(args):
     '''Gentoo Cloud Image Builder Utility'''
@@ -66,7 +66,6 @@ def main(args):
 
     elif args.action == "step":
         import gentooimgr.steps
-        print(args.steps)
         code = gentooimgr.steps.run_step(args, configjson, *args.steps)
 
     return code
@@ -98,7 +97,7 @@ if __name__ == "__main__":
     parser.add_argument("--use-mbr", action="store_const", const="mbr", dest="parttype",
                         help="Enable MBR for the resulting gentoo image partition type If not set, is autodetected.")
     parser.add_argument("-N", "--new-world-mac", action="store_true",
-                        help="Handles specifics regarding Apple (TM) partioning schemes and their OpenEFI bootloader")
+                        help="Handles specifics regarding Apple (TM) partioning schemes and OpenFirmware")
     # currently only pretends for install and maybe some kernel action. FIXME
     parser.add_argument("--pretend", action="store_true", help="Log commands instead of running them, no chrooting")
 
@@ -129,6 +128,10 @@ if __name__ == "__main__":
                                help="Where kernel is specified. By default uses the active linux kernel")
     parser.add_argument("--kernel-dist", action="store_true",
                         help="Use a distribution kernel in the installation. Overrides all other kernel options.")
+    parser.add_argument("-I", "--install-only", action="store_true",
+                        help="Downloads files such as stage3 and portage during install phase instead of expecting it at build")
+    parser.add_argument("--ignore-collisions", nargs="+",
+                        help="A list of paths that emerge will ignore collisions on. Only set if needed.")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
@@ -162,8 +165,7 @@ if __name__ == "__main__":
     # --force also applies to clean action
 
     parser_step = subparsers.add_parser('step', help="Invoke an individual step")
-    max_step = max(STEPS.keys())
-    parser_step.add_argument("steps", nargs="+", default=(), type=int, help=f"Steps 0-{max_step}")
+    parser_step.add_argument("steps", nargs="+", default=(), type=int, help=f"Steps 0-{LAST_STEP}")
 
     parser_status = subparsers.add_parser('status', help="Review information, downloaded images and configurations")
 

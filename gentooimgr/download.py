@@ -94,18 +94,24 @@ def verify(args, _type: str, baseurl: str, hashpattern, filename: str) -> bool:
         else:
             assert hd == _hash, f"Hash mismatch {hd} != {_hash}, use --force to bypass"
 
-def download_stage3(args, url=None) -> str:
+def download_stage3(args, url=None, cfg={}) -> str:
+    uname = cfg.get("architecture", os.uname().machine)
+    if uname.startswith("ppc"):
+        uname = "ppc"  # fix gentoo not having separate 32/64bit ppc urls/files
+    C = gentooimgr.config.config(architecture=uname)
     if url is None:
+        if not hasattr(args, "profile"):
+            # Set this to either the config value or empty, defaulting it to openrc
+            args.profile = cfg.get("initsys")
         if args.profile == "systemd":
-            url = os.path.join(config.GENTOO_BASE_STAGE_SYSTEMD_URL, config.GENTOO_LATEST_STAGE_SYSTEMD_FILE)
+            url = os.path.join(C.GENTOO_BASE_STAGE_SYSTEMD_URL, C.GENTOO_LATEST_STAGE_SYSTEMD_FILE)
 
         else:
-            url = os.path.join(config.GENTOO_BASE_STAGE_OPENRC_URL, config.GENTOO_LATEST_STAGE_OPENRC_FILE)
+            url = os.path.join(C.GENTOO_BASE_STAGE_OPENRC_URL, C.GENTOO_LATEST_STAGE_OPENRC_FILE)
 
     filename = os.path.basename(url)
     fullpath = os.path.join(args.download_dir, filename)
     if not os.path.exists(fullpath) or args.redownload or older_than_a_day(fullpath):
-        print(f"Downloading {filename}")
         urlretrieve(url, fullpath, DownloadProgressBar())
 
     hashtype, latest, size = parse_latest_stage3_text(fullpath)
@@ -114,22 +120,21 @@ def download_stage3(args, url=None) -> str:
     filename = latest
     fullpath = os.path.join(args.download_dir, filename)
     if not os.path.exists(fullpath) or args.redownload:
-        print(f"Downloading {filename}")
         url = os.path.join(
-                config.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
-                config.GENTOO_BASE_STAGE_OPENRC_URL,
+                C.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
+                C.GENTOO_BASE_STAGE_OPENRC_URL,
                 filename)
         urlretrieve(url, fullpath, DownloadProgressBar())
 
     # Verify byte size
     stage3size = os.path.getsize(fullpath)
     assert size == stage3size, f"Stage 3 size {size} does not match expected value {stage3size}."
-    verify(args, hashtype, config.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
-           config.GENTOO_BASE_STAGE_OPENRC_URL,  stage3hashpattern, filename)
+    verify(args, hashtype, C.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
+           C.GENTOO_BASE_STAGE_OPENRC_URL,  stage3hashpattern, filename)
     return fullpath
 
 
-def download_portage(args, url=None) -> str:
+def download_portage(args, url=None, cfg={}) -> str:
     """Handle downloading of portage system for installation into cloud image
 
     We always download the latest portage package and rename it to today's date.
@@ -139,8 +144,12 @@ def download_portage(args, url=None) -> str:
 
 
     """
+    uname = cfg.get("architecture", os.uname().machine)
+    if uname.startswith("ppc"):
+        uname = "ppc"  # fix gentoo not having separate 32/64bit ppc urls/files
+    C = gentooimgr.config.config(architecture=uname)
     if url is None:
-        url = config.GENTOO_PORTAGE_FILE
+        url = C.GENTOO_PORTAGE_FILE
 
     base = os.path.basename(url)  # Uses 'latest' filename
     today = date.today()

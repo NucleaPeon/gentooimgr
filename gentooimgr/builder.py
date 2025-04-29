@@ -9,7 +9,6 @@ from gentooimgr.logging import LOG
 
 def build(args: argparse.Namespace, config: dict) -> int:
     c = gentooimgr.config.config(config.get("architecture"))
-    print(config.get("iso"))
     iso = config.get("iso") or download.download(args, c)
     stage3 = config.get("stage3") or download.download_stage3(args)
     portage = config.get("portage") or download.download_portage(args)
