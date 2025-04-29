@@ -24,13 +24,47 @@ from gentooimgr.configs import *
 FILES_DIR = os.path.join(HERE, "..")
 LAST_STEP = 18
 
+STEPS = {
+    1: "Disk Preparation",
+    2: "Mounting",
+    3: "Stage3 Tarball",
+    4: "Binding Filesystems",
+    5: "Portage",
+    6: "Licenses",
+    7: "Repo Configuration",
+    8: "Resolv",
+    9: "Emerge Sync",
+    10: "Emerge Packages",
+    11: "Kernel",
+    12: "Grub",
+    13: "Serial",
+    14: "Networking",
+    15: "Services",
+    16: "Sysconfig",
+    17: "/etc/fstab",
+    18: "Setting Passwords"
+}
+
+
 def step1_diskprep(args, cfg):
-    LOG.info(":: Step 1: Disk Preparation")
+    LOG.info(f":: Step 1: {STEPS[1]}")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = []
     partnum = 1
-    if args.parttype == "efi":
+    if args.new_world_mac:
+        # do a completely different partitioning process
+        LOG.debug("Setting up New World Mac partitioning scheme")
+        # Detect if fdisk-mac exists
+        code, o, e = run_cmd(["mac-fdisk", "-l"])
+        if code != 0:
+            LOG.error("mac-fdisk program not found, cannot continue")
+            return
+
+#         cmds.extend([
+#
+#         ])
+    elif args.parttype == "efi":
         cmds.extend([
             ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
             ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
@@ -57,7 +91,7 @@ def step1_diskprep(args, cfg):
     completestep(args, 1, "diskprep")
 
 def step2_mount(args, cfg):
-    LOG.info(f":: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}")
+    LOG.info(f":: Step 2: {STEPS[2]} {gentooimgr.config.GENTOO_MOUNT}")
 
     partnum = 1
     cmd = []
@@ -76,7 +110,7 @@ def step2_mount(args, cfg):
     completestep(args, 2, "mount")
 
 def step3_stage3(args, cfg):
-    LOG.info(f":: Step 3: Stage3 Tarball")
+    LOG.info(f":: Step 3: {STEPS[3]}")
     stage3 = cfg.get("stage3") or args.stage3  # FIXME: auto detect stage3 images in mountpoint and add here
     if not stage3:
         stage3 = gentooimgr.common.stage3_from_dir(FILES_DIR)
@@ -88,12 +122,12 @@ def step3_stage3(args, cfg):
     completestep(args, 3, "stage3")
 
 def step4_binds(args, cfg):
-    LOG.info(':: Step 4: Binding Filesystems')
+    LOG.info(f':: Step 4: {STEPS[4]}')
     if not args.pretend: gentooimgr.chroot.bind(verbose=args.debug)
     completestep(args, 4, "binds")
 
 def step5_portage(args, cfg):
-    LOG.info(':: Step 5: Portage')
+    LOG.info(f':: Step 5: {STEPS[5]}')
     portage = cfg.get("portage") or args.portage
     if not portage:
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
@@ -116,7 +150,7 @@ def step5_portage(args, cfg):
     completestep(args, 5, "portage")
 
 def step6_licenses(args, cfg):
-    LOG.info(':: Step 6: Licenses')
+    LOG.info(f':: Step 6: {STEPS[6]}')
     license_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.license')
     os.makedirs(license_path, exist_ok=True)
     for f, licenses in cfg.get("licensefiles", {}).items():
@@ -126,7 +160,7 @@ def step6_licenses(args, cfg):
     completestep(args, 6, "license")
 
 def step7_repos(args, cfg):
-    LOG.info(':: Step 7: Repo Configuration')
+    LOG.info(f':: Step 7: {STEPS[7]}')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
     if not args.pretend: os.makedirs(repo_path, exist_ok=True)
     # Copy from template
@@ -154,7 +188,7 @@ def step7_repos(args, cfg):
     completestep(args, 7, "repos")
 
 def step8_resolv(args, cfg):
-    LOG.info(f':: Step 8: Resolv')
+    LOG.info(f':: Step 8: {STEPS[8]}')
     if not os.path.exists(cfg.get("mountpoint")):
         return
     run_cmd(args, ["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
@@ -165,7 +199,7 @@ def step8_resolv(args, cfg):
     completestep(args, 8, "resolv")
 
 def step9_sync(args, cfg):
-    LOG.info(f":: Step 9: sync")
+    LOG.info(f":: Step 9: {STEPS[9]}")
     os.chdir(os.sep)
     env = os.environ
     if args.ignore_collisions:
@@ -179,7 +213,7 @@ def step9_sync(args, cfg):
     completestep(args, 9, "sync")
 
 def step10_emerge_pkgs(args, cfg):
-    LOG.info(f":: Step 10: emerge pkgs")
+    LOG.info(f":: Step 10: {STEPS[10]}")
     packages = cfg.get("packages", {})
     env = os.environ
     if args.ignore_collisions:
@@ -223,7 +257,7 @@ def step10_emerge_pkgs(args, cfg):
 
 def step11_kernel(args, cfg):
     # at this point, genkernel will be installed. Please note that configuration files must be copied before this point
-    LOG.info(f":: Step 11: kernel")
+    LOG.info(f":: Step 11: {STEPS[11]}")
     run_cmd(args, ["eselect", "kernel", "set", "1"])
     if not args.kernel_dist and not args.pretend:
         gentooimgr.kernel.build_kernel(args, cfg, inchroot=not os.path.exists('/mnt/gentoo'))
@@ -244,7 +278,7 @@ def step11_kernel(args, cfg):
     completestep(args, 11, "kernel")
 
 def step12_grub(args, cfg):
-    LOG.info(f":: Step 12: kernel")
+    LOG.info(f":: Step 12: {STEPS[12]}")
     cmd = ["grub-install"]
     if args.parttype == "efi":
         cmd += ["--target=x86_64-efi", '--efi-directory=/boot/efi']
@@ -275,14 +309,14 @@ def step12_grub(args, cfg):
     completestep(args, 12, "grub")
 
 def step13_serial(args, cfg):
-    LOG.info(f":: Step 13: Serial")
+    LOG.info(f":: Step 13: {STEPS[13]}")
     if cfg.get("serial") and not args.pretend:
         os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
         os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
     completestep(args, 13, "serial")
 
 def step14_networking(args, cfg):
-    LOG.info(f":: Step 14: Services")
+    LOG.info(f":: Step 14: {STEPS[14]}")
     os.chdir('/etc/init.d')
     os.symlink('net.lo', 'net.eth0')
     # link /etc/init.d/net.lo ->/etc/init.d/net.eth0
@@ -291,7 +325,7 @@ def step14_networking(args, cfg):
     completestep(args, 14, "networking")
 
 def step15_services(args, cfg):
-    LOG.info(f":: Step 15: Services")
+    LOG.info(f":: Step 15: {STEPS[15]}")
     services = args.services or []
     services += cfg.get("services", [])
     for service in services:
@@ -302,7 +336,7 @@ def step15_services(args, cfg):
     completestep(args, 15, "services")
 
 def step16_sysconfig(args, cfg):
-    LOG.info(f":: Step 16: Sysconfig")
+    LOG.info(f":: Step 16: {STEPS[16]}")
     if not args.pretend:
         with open("/etc/timezone", "w") as f:
             f.write("UTC")
@@ -349,7 +383,7 @@ def step16_sysconfig(args, cfg):
     completestep(args, 16, "sysconfig")
 
 def step17_fstab(args, cfg):
-    LOG.info(f":: Step 17: fstab")
+    LOG.info(f":: Step 17: {STEPS[17]}")
     partition = 1
     if not args.pretend:
         with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
@@ -364,7 +398,7 @@ def step18_passwd(args, cfg):
     """Keep in mind that users that do not exist but have passwords may silently fail.
     If a user is not in /etc/shadow, the sed command will fail.
     """
-    LOG.info(f":: Step 18: Setting Root Password")
+    LOG.info(f":: Step 18: {STEPS[18]}")
     passwords = cfg.get("passwords", {})
     if passwords and not args.pretend:
         shutil.copyfile("/etc/shadow", "/root/shadow.bak")
@@ -502,3 +536,23 @@ def configure(args, config: dict) -> int:
     return gentooimgr.errorcodes.SUCCESS
 
 
+STEP_FUNCS = {
+    1: step1_diskprep,
+    2: step2_mount,
+    3: step3_stage3,
+    4: step4_binds,
+    5: step5_portage,
+    6: step6_licenses,
+    7: step7_repos,
+    8: step8_resolv,
+    9: step9_sync,
+    10: step10_emerge_pkgs,
+    11: step11_kernel,
+    12: step12_grub,
+    13: step13_serial,
+    14: step14_networking,
+    15: step15_services,
+    16: step16_sysconfig,
+    17: step17_fstab,
+    18: step18_passwd
+}

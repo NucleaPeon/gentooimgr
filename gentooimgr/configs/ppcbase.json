@@ -27,7 +27,6 @@
             "syslog-ng",
             "dhcpcd",
             "mlocate",
-            "xfsprogs",
             "dosfstools",
             "sudo",
             "postfix",

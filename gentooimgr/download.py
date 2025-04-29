@@ -14,15 +14,15 @@ import hashlib
 import progressbar
 from urllib.request import urlretrieve
 import tempfile
-import gentooimgr.config as config
+import gentooimgr.config
 from gentooimgr.logging import LOG
 from gentooimgr.common import older_than_a_day
 
-hashpattern =    re.compile(config.GENTOO_FILE_HASH_RE, re.MULTILINE)
-isopattern =     re.compile(config.GENTOO_FILE_ISO_RE, re.MULTILINE)
-isohashpattern = re.compile(config.GENTOO_FILE_ISO_HASH_RE, re.MULTILINE)
-stage3pattern  = re.compile(config.GENTOO_FILE_STAGE3_RE, re.MULTILINE)
-stage3hashpattern = re.compile(config.GENTOO_FILE_STAGE3_HASH_RE, re.MULTILINE)
+hashpattern =    re.compile(gentooimgr.config.GENTOO_FILE_HASH_RE, re.MULTILINE)
+isopattern =     re.compile(gentooimgr.config.GENTOO_FILE_ISO_RE, re.MULTILINE)
+isohashpattern = re.compile(gentooimgr.config.GENTOO_FILE_ISO_HASH_RE, re.MULTILINE)
+stage3pattern  = re.compile(gentooimgr.config.GENTOO_FILE_STAGE3_RE, re.MULTILINE)
+stage3hashpattern = re.compile(gentooimgr.config.GENTOO_FILE_STAGE3_HASH_RE, re.MULTILINE)
 
 class DownloadProgressBar():
     def __init__(self):
@@ -155,10 +155,11 @@ def download_portage(args, url=None) -> str:
     return fullpath
 
 
-def download(args, url=None) -> str:
+def download(args, config, url=None) -> str:
     """Download txt file with iso name and hash type
     :Parameters:
         - args: Namespace with parsed arguments
+        - config: Namespace of configurations from gentooimgr.config.config()
         - url: str or None. If None, will generate a url to the latest minimal install iso
 
     :Returns:

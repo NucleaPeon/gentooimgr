@@ -51,6 +51,7 @@ def run_image(
         - config: dict configuration from json file
         - livecd: bool whether to include the gentoo live cd
     """
+    c = gentooimgr.config.config(config.get("architecture"))
     iso = config.get("iso") if not args.iso else args.iso
     if livecd:
         iso = gentooimgr.common.find_iso(
@@ -69,28 +70,44 @@ def run_image(
     LOG.debug(f"\t:: Live cd is {livecd} for image {image} and iso {iso}")
     qmounts = []
     mounts.extend(args.mounts)
-    for i in mounts:
-        qmounts.append("-drive")
-        qmounts.append(f"file={i},media=cdrom")
+
+    for idx, m in enumerate(mounts):
+        # qmounts += [
+        #     "-device", f"usb-storage,drive=usb{idx}",
+        #     "-drive", f"file={m},if=none,id=usb{idx},format=raw"
+        # ]
+
+        # qmounts += [
+        #     "-device", f"media,drive=cdrom{idx}",
+        #     "-drive", f"file={m},if=none,id=cdrom{idx},format=raw"
+        # ]
+        qmounts += [
+            "-cdrom", m# , "-monitor", "/dev/tty"
+        ]
+
+    # for i in mounts:
+        # qmounts.append("-drive")
+        # qmounts.append(f"file={i},media=cdrom")
 
     name, ext = os.path.splitext(image)
     ext = ext.strip(".")
 
-    threads = args.threads
     cmd = [
-        config.get("qemu_prog", gentooimgr.config.DEFAULT_QEMU_CMD),
+        config.get("qemu_prog", c.GENTOO_CMD),
         "-enable-kvm" if config.get("enable_kvm", False) else "",
         "-m", str(config.get("memory", 2048)),
-        "-smp", str(threads),
-        "-drive", f"file={image},if=virtio,index=0,format={ext}",
+        "-drive", f"file={image},if={"virtio" if c.ARCHITECTURE == "amd64" else "none"},index=0,format={ext}",
         "-net", "nic,model=virtio",
         "-net", "user",
-        "-cpu", "kvm64",
-        "-chardev", "file,id=charserial0,path=gentoo.log",
-        "-device", "isa-serial,chardev=charserial0,id=serial0",
-        "-chardev", "pty,id=charserial1",
-        "-device", "isa-serial,chardev=charserial1,id=serial1"
+        "-cpu", config.get("cpu"),
+        "-chardev", "file,id=charserial0,path=gentoo.log"
     ]
+    if c.ARCHITECTURE != "arm":
+        cmd += ["-device", "isa-serial,chardev=charserial0,id=serial0",
+                "-chardev", "pty,id=charserial1",
+                "-device", "isa-serial,chardev=charserial1,id=serial1"]
+    if config.get("smp", False):
+        cmd += ["-smp", str(args.threads)]
     if config.get("vga"):
         cmd += ["-vga", config.get("vga")]
     if config.get("machine"):
@@ -108,6 +125,7 @@ def run_image(
 
     cmd += qmounts
     LOG.debug(' '.join(cmd))
+    print(cmd)
     proc = Popen(cmd, stderr=PIPE, stdout=PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:

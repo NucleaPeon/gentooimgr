@@ -1,6 +1,6 @@
 import os
 import argparse
-import gentooimgr.config as config
+import gentooimgr.config
 import gentooimgr.download as download
 import gentooimgr.qemu as qemu
 import gentooimgr.common
@@ -8,7 +8,9 @@ import gentooimgr.errorcodes
 from gentooimgr.logging import LOG
 
 def build(args: argparse.Namespace, config: dict) -> int:
-    iso = config.get("iso") or download.download(args)
+    c = gentooimgr.config.config(config.get("architecture"))
+    print(config.get("iso"))
+    iso = config.get("iso") or download.download(args, c)
     stage3 = config.get("stage3") or download.download_stage3(args)
     portage = config.get("portage") or download.download_portage(args)
     filename = f"{args.image}.{args.format}"

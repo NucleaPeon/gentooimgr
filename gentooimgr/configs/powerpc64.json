@@ -1,4 +1,5 @@
 {
+    "architecture": "ppc64",
     "inherit": "ppcbase.json",
     "imgsize": "20G",
     "memory": 4096,

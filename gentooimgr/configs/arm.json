@@ -1,12 +1,13 @@
 {
-    "architecture": "amd64",
+    "architecture": "arm",
     "inherit": null,
-    "smp": true,
-    "cpu": "kvm64",
+    "iso": "/home/raven/Downloads/ubuntu-24.04.2-live-server-arm64.iso",
     "imgsize": "20G",
-    "memory": 4096,
-    "enable_kvm": true,
-    "vga": "virtio",
+    "machine": "raspi1ap",
+    "vga": "std",
+    "smp": false,
+    "cpu": "arm1176",
+    "memory": 512,
     "mountpoint": "/mnt/gentoo",
     "imagename": null,
     "initsys": "openrc",
@@ -14,7 +15,8 @@
         "kernel": ["sys-kernel/linux-firmware linux-fw-redistributable"]
     },
     "kernel": {
-        "path": "/etc/kernels/config.d/gentooimgr-base.config"
+        "path": "/etc/kernels/config.d/gentooimgr-qemu.config",
+        "config": "qemu.config"
     },
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
@@ -43,7 +45,6 @@
             "dev-vcs/git",
             "net-misc/curl",
             "usbutils",
-            "pciutils",
             "logrotate",
             "gptfdisk",
             "sys-block/gpart",
@@ -51,7 +52,9 @@
             "linux-firmware"
         ],
         "additional": [
-            "app-editors/vim"
+            "app-editors/vim",
+            "app-emulation/qemu-guest-agent",
+            "sys-process/cronie"
         ],
         "oneshots": [
             "portage"
@@ -76,10 +79,14 @@
         "sshd": "default",
         "syslog-ng": "default",
         "acpid": "default",
-        "nfsclient": "default"
+        "nfsclient": "default",
+        "qemu-guest-agent": "default",
+        "cronie": "default"
     },
-    "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": "/dev/sda"
+    "disk": "/dev/vda",
+    "passwords": {
+        "root": "root"
+    }
 }

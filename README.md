@@ -32,7 +32,8 @@ Thanks!
 
 * [X] Use gentooimgr to configure and Install a Base Gentoo OS using the least amount of configuration
 * [X] Use gentooimgr to create a usable cloud image without a binary dist kernel
-* [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64)
+* [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64, arm)
+* [ ] Gentoo ARM doesn't have an iso available to download, so I will be producing one.
 * [ ] Allow better handling from image building third party software such as ansible and terraform
 * [ ] Build turnkey (LXC) images
 

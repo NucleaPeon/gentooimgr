@@ -11,6 +11,7 @@ PROFILE = {args.profile}
 """)
     print(f"CONFIG {args.config}")
     print(json.dumps(configjson, sort_keys=True, indent=4))
+    print(gentooimgr.config.config(configjson.get("architecture", "amd64")))
 
     # inherit = configjson.get("inherit")
     # if inherit:
