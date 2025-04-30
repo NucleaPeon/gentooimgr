@@ -205,7 +205,7 @@ if __name__ == "__main__":
     parser_shrink.add_argument("--only-convert", action="store_true",
                                help="Convert and exit, do not attempt to shrink the image.")
     parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag.")
-
+    parser_kernel.add_argument("--kconf", nargs="?", help="Specify which kernel configuration file to build with")
 
     args = parser.parse_args()
     gentooimgr.logging.set_logger(args)  # Pulls out logging parameters to configure logging for any process.

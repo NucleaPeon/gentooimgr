@@ -42,7 +42,6 @@
             "pciutils",
             "logrotate",
             "gptfdisk",
-            "sys-block/gpart",
             "net-fs/nfs-utils",
             "linux-firmware",
             "sys-fs/hfsutils"

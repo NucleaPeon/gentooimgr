@@ -212,6 +212,9 @@ def step8_resolv(args, cfg):
     if not os.path.exists(cfg.get("mountpoint")):
         return
     run_cmd(args, ["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
+    if args.new_world_mac:
+        #FIXME: This is test code and shouldn't be used in release.
+        run_cmd(args, ["cp", "--dereference", os.path.join(os.path.abspath(__file__), "configs", "powerpc64.make.conf"), os.path.join(cfg.get("mountpoint"), 'etc', 'make.conf')])
     # Copy all step files and python module to new chroot
     if not args.pretend:
         os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
@@ -234,6 +237,12 @@ def step9_sync(args, cfg):
 
 def step10_emerge_pkgs(args, cfg):
     LOG.info(f":: Step 10: {STEPS[10]}")
+    if args.new_world_mac:
+        #FIXME: This is test code and shouldn't be used in release.
+        run_cmd(args, ["cp", "-vf", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                 "configs",
+                                                 "powerpc64.make.conf"),
+                        os.path.join(cfg.get("mountpoint"), 'etc', 'make.conf')])
     packages = cfg.get("packages", {})
     env = os.environ
     if args.ignore_collisions:
@@ -485,6 +494,21 @@ def prechroot(args, cfg):
     exists = os.path.exists(cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH))
     LOG.info(f"\t::Kernel configuration exists: {exists}")
 
+def chrootfunc(args, cfg):
+    # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
+    if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
+        LOG.info(":: Binding and Mounting, Entering CHROOT")
+        if not os.path.exists('/mnt/gentoo') and args.force or args.pretend:
+            LOG.info(":: Using --force or --pretend, no /mnt/gentoo found so skipping chroot")
+
+        else:
+            prechroot(args, cfg)
+            gentooimgr.chroot.bind()
+            os.chdir(os.sep)
+            os.chroot(cfg.get("mountpoint"))
+
+        os.chdir(os.sep)
+
 def configure(args, config: dict) -> int:
     # Load configuration
     if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
@@ -510,19 +534,8 @@ def configure(args, config: dict) -> int:
     if not stepdone(7): step7_repos(args, cfg)
     # portage env files and resolv.conf
     if not stepdone(8): step8_resolv(args, cfg)
-    # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
-    if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
-        LOG.info(":: Binding and Mounting, Entering CHROOT")
-        if not os.path.exists('/mnt/gentoo') and args.force or args.pretend:
-            LOG.info(":: Using --force or --pretend, no /mnt/gentoo found so skipping chroot")
 
-        else:
-            prechroot(args, cfg)
-            gentooimgr.chroot.bind()
-            os.chdir(os.sep)
-            os.chroot(config.get("mountpoint"))
-
-        os.chdir(os.sep)
+    chrootfunc(args, cfg)
 
     # emerge --sync
     if not stepdone(9): step9_sync(args, cfg)
@@ -554,6 +567,7 @@ def configure(args, config: dict) -> int:
     return gentooimgr.errorcodes.SUCCESS
 
 
+
 STEP_FUNCS = {
     1: step1_diskprep,
     2: step2_mount,
@@ -572,5 +586,6 @@ STEP_FUNCS = {
     15: step15_services,
     16: step16_sysconfig,
     17: step17_fstab,
-    18: step18_passwd
+    18: step18_passwd,
+    'chroot': chrootfunc
 }

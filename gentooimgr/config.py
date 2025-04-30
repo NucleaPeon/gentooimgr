@@ -2,8 +2,9 @@ import os
 import json
 import sys
 import argparse
-import gentooimgr.configs
 import multiprocessing
+import gentooimgr.configs
+from gentooimgr.logging import LOG
 
 # A day in seconds:
 DAY_IN_SECONDS = 60*60*24
@@ -58,6 +59,7 @@ CLOUD_MODULES = [
 def load_config(path):
     if os.path.exists(path):
         with open(path, 'r') as f:
+            LOG.info(path)
             return json.loads(f.read())
     return {}
 

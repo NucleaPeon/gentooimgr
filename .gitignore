@@ -17,3 +17,8 @@ __pycache__/
 *.fd
 *.log
 gentooimgr.egg-info/
+bin/
+build/
+lib/
+pyvenv.cfg
+

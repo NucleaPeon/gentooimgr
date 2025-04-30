@@ -18,6 +18,8 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 
 **IMPORTANT**: Gentoo with EFI and Cloud-Init configuration is buggy: https://github.com/canonical/cloud-init/issues/3999
 
+
+
 ## Preface
 
 This project was created so I could spawn off Gentoo OS templates on my Proxmox server for various services while being more efficient than many other Linux OS's and avoiding systemd.
@@ -36,11 +38,12 @@ Thanks!
 * [ ] Gentoo ARM doesn't have an iso available to download, so I will be producing one.
 * [ ] Allow better handling from image building third party software such as ansible and terraform
 * [ ] Build turnkey (LXC) images
+* [ ] Fix step invocation to a nicer implementation. Currently in install.py, these should be their own classes and dynamically loaded in based on architecture (with default/base fallbacks) so users can simply drop in a folder of class definitions to customize an architecture's build and install process.
 
 ## Prerequisites
 
 * [ ] QEMU
-* [ ] python3.11
+* [ ] python3.11 and pip (to install deps)
 * [ ] Recommended 20GB of space
 * [ ] Internet Connection
 * [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional)
@@ -65,7 +68,21 @@ cd /mnt/gi
 python -m gentooimgr --config-cloud install
 python -m gentooimgr unchroot
 ```
-networkmanager
+
+## Quick Start Native PPC
+
+If installing your powerpc operating system, things are a touch more complicated. Download gentooimgr onto a usb stick or transfer via ssh/scp/rsync. Assume ``/root/gentooimgr`` is the path to this repo's contents.
+
+```sh
+cd /root/gentooimgr
+python pyvenvex.py .
+bin/pip install -r requirements.txt .
+bin/python -m gentooimgr -N -I --config-ppc-64 install
+# Or use --config-ppc-32
+```
+
+PPC ignores the ``--use-efi``flag, as OpenFirmware already uses EFI and there's very little room to customize new world mac boot processes due to how particular they are.
+
 ### Using EFI
 
 This is slightly more complicated.
@@ -211,6 +228,7 @@ Work may be done to see if this can be avoided, but for now consider it a requir
 
 ## TODO
 
+* [ ] Have a way to include custom make.conf in install process. (its own step?)
 * [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
 * [ ] Upload to ``pip``
 * [ ] Do a check for /mnt/gentoo/etc/resolv.conf and if not found, auto copy it when using the ``chroot`` action so user isn't left without network access.

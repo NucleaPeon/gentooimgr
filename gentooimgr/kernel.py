@@ -34,8 +34,11 @@ def get_installed_kernel_config_path(args, config, inchroot):
     We prepend 'gentooimgr' for explicit readability.
     """
     name = get_kernel_config_name(args, config)
+    LOG.info(f"Kernel name {name}")
     kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', 'etc', 'kernels', 'config.d') if not inchroot else os.path.join(os.sep, 'etc', 'kernels', 'config.d')
-    return os.path.join(kerneldir, f'gentooimgr-{name}.config')
+    LOG.info(f"Kernel dir {kerneldir}")
+    # Explicitly prefer the supplied --config arg if given
+    return args.kconf or os.path.join(kerneldir, f'gentooimgr-{name}.config')
 
 def kernel_copy_conf(args, config, inchroot=False) -> int:
     """Copies our *.config file into /etc/kernels/config.d/[name].config.
@@ -72,6 +75,7 @@ def build_kernel(args, config, inchroot=False) -> int:
         return code
 
     kerneldir = args.kernel_dir
+    LOG.info(f"Kernel dir {kerneldir}")
     if not inchroot:
         if kerneldir[0] == os.sep:
             kerneldir = kerneldir[1:] # remove '/' from
