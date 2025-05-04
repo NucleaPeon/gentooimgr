@@ -44,11 +44,11 @@
             "gptfdisk",
             "net-fs/nfs-utils",
             "linux-firmware",
-            "sys-fs/hfsutils"
+            "sys-fs/hfsutils",
+            "sys-fs/mac-fdisk"
         ],
         "additional": [
-            "app-editors/vim",
-            "sys-process/htop"
+            "app-editors/vim"
         ],
         "oneshots": [
             "portage"

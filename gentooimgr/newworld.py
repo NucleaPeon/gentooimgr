@@ -98,3 +98,38 @@ def write_partition(partition):
 
     child.sendline("w")
     child.sendline("y")
+
+
+def setup_hfs_bootloader(hfsbootloader):
+    code, o, e = run(['dd' , 'if=/dev/zero', f'of=/dev/{hfsbootloader}', 'bs=512'])
+    code, o, e = run(['hformat', '-l', 'bootstrap', hfsbootloader])
+    tmpdir = os.path.join(os.sep, 'tmp', 'bootstrap')
+    os.makedirs(tmpdir, exist_ok=True)
+    code, o, e = run(['mount', '-t', 'hfs', hfsbootloader, tmpdir])
+    code, o, e = run(['grub-install', f'--macppc-directory={tmpdir}'])
+    code, o, e = run(['umount', hfsbootloader, tmpdir])
+
+
+def hfs_bless(hfsbootloader):
+    code, o, e = run(['hmount', hfsbootloader])
+    code, o, e = run(['hattrib', '-t', 'tbxi', '-c', 'UNIX', ":System:Library:CoreServices:BootX"])
+    code, o, e = run(['hattrib', '-b', ":System:Library:CoreServices"])
+    code, o, e = run(['humount'])
+
+def newworldmac_grub():
+    #
+    contents = ""
+    with open(os.path.join(os.sep, 'etc', 'default', 'grub'), 'r') as grub:
+        contents = grub.read()
+
+    contents.replace("#GRUB_TIMEOUT=5", "GRUB_TIMEOUT=3")
+    contents.replace("#GRUB_TIMEOUT_STYLE=menu", "GRUB_TIMEOUT_STYLE=menu")
+    # nouveau.modeset=0
+    contents.replace('#GRUB_CMDLINE_LINUX=""', 'GRUB_CMDLINE_LINUX="rootfstype=ext4"')
+    if not "GRUB_PRELOAD_MODULES" in contents:
+        contents.append("""GRUB_PRELOAD_MODULES="ieee1275_fb linux normal eval memdisk read test test_blockarg trig true"\n""")
+
+    with open(os.path.join(os.sep, 'etc', 'default', 'grub'), 'w') as grub:
+        grub.write(contents)
+
+    code, o, e = run(['grub-mkconfig', '-o', '/boot/grub/grub.cfg'])
