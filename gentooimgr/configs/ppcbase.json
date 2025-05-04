@@ -47,7 +47,8 @@
             "sys-fs/hfsutils"
         ],
         "additional": [
-            "app-editors/vim"
+            "app-editors/vim",
+            "sys-process/htop"
         ],
         "oneshots": [
             "portage"
