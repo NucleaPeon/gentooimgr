@@ -101,7 +101,7 @@ def write_partition(partition):
 
 
 def setup_hfs_bootloader(hfsbootloader):
-    code, o, e = run(['dd' , 'if=/dev/zero', f'of=/dev/{hfsbootloader}', 'bs=512'])
+    code, o, e = run(['dd' , 'if=/dev/zero', f'of={hfsbootloader}', 'bs=512'])
     code, o, e = run(['hformat', '-l', 'bootstrap', hfsbootloader])
     tmpdir = os.path.join(os.sep, 'tmp', 'bootstrap')
     os.makedirs(tmpdir, exist_ok=True)
@@ -127,7 +127,7 @@ def newworldmac_grub():
     # nouveau.modeset=0
     contents.replace('#GRUB_CMDLINE_LINUX=""', 'GRUB_CMDLINE_LINUX="rootfstype=ext4"')
     if not "GRUB_PRELOAD_MODULES" in contents:
-        contents.append("""GRUB_PRELOAD_MODULES="ieee1275_fb linux normal eval memdisk read test test_blockarg trig true"\n""")
+        contents += """\nGRUB_PRELOAD_MODULES="ieee1275_fb linux normal eval memdisk read test test_blockarg trig true"\n"""
 
     with open(os.path.join(os.sep, 'etc', 'default', 'grub'), 'w') as grub:
         grub.write(contents)

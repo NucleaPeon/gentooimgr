@@ -313,9 +313,9 @@ def step12_grub(args, cfg):
         # Kinda ugly, with new world macs, we expect a partition map (ie: /dev/sda1) and an hfs bootloader (/dev/sda2)
         # before typical layout (/boot, swap, root)
         part = f'{cfg.get("disk")}{cfg.get("partition_start", 3)-1}'
-        newworld.setup_hfs_bootloader(part)
-        newworld.hfs_bless(part)
-        newworld.newworldmac_grub()
+        gentooimgr.newworld.setup_hfs_bootloader(part)
+        gentooimgr.newworld.hfs_bless(part)
+        gentooimgr.newworld.newworldmac_grub()
         return completestep(args, 12, "grub")
 
     cmd = ["grub-install"]
