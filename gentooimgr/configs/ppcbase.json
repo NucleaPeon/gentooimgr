@@ -64,7 +64,6 @@
             "sys-boot/grub:2"
         ],
         "kernel": [
-            "sys-kernel/genkernel",
             "gentoo-sources",
             "gentoolkit"
         ]

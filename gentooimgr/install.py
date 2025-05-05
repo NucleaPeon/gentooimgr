@@ -308,16 +308,6 @@ def step11_kernel(args, cfg):
 
 def step12_grub(args, cfg):
     LOG.info(f":: Step 12: {STEPS[12]}")
-    if args.new_world_mac:
-        LOG.info(f"\t:: Setting up New World Mac partition")
-        # Kinda ugly, with new world macs, we expect a partition map (ie: /dev/sda1) and an hfs bootloader (/dev/sda2)
-        # before typical layout (/boot, swap, root)
-        part = f'{cfg.get("disk")}{cfg.get("partition_start", 3)-1}'
-        gentooimgr.newworld.setup_hfs_bootloader(part)
-        gentooimgr.newworld.hfs_bless(part)
-        gentooimgr.newworld.newworldmac_grub()
-        return completestep(args, 12, "grub")
-
     cmd = ["grub-install"]
     if args.parttype == "efi":
         cmd += ["--target=x86_64-efi", '--efi-directory=/boot/efi']
@@ -429,6 +419,14 @@ def step17_fstab(args, cfg):
             if args.parttype == "efi":
                 fstab.write(f"{cfg.get('disk')}{partition}\t/boot\tvfat\tnoatime\t1 2\n")
                 partition += 1
+
+            if args.new_world_mac:
+                partition = cfg.get("partition_start", 3)
+                fstab.write(f"{cfg.get('disk')}{partition}\t/boot\text2\tnoatime\t1 2\n")
+                partition += 1
+                fstab.write(f"{cfg.get('disk')}{partition}\tnone\tswap\tsw\t0 0\n")
+                partition += 1
+
             fstab.write(f"{cfg.get('disk')}{partition}\t/\text4\tdefaults,noatime\t0 1\n")
 
     completestep(args, 17, "fstab")
@@ -573,6 +571,8 @@ def configure(args, config: dict) -> int:
     if not stepdone(18): step18_passwd(args, cfg)
     # copy cloud cfg?
     if not args.pretend: gentooimgr.chroot.unbind()
+
+    LOG.info(":: Install process complete.")
     # Finish install processes like emaint and eix-update and news read
     return gentooimgr.errorcodes.SUCCESS
 

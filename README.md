@@ -1,7 +1,11 @@
 # GentooImgr: Gentoo Image Builder for Cloud and Turnkey ISO installers
 
 
-GentooImgr is a python script system to build cloud images based on Gentoo Linux.
+GentooImgr is a python script system to automatically build gentoo, specifically qemu and cloud images, or for a native installation.
+
+It will download portage and stage3 archives, handle mounting, chrooting and other aspects. The aim of this project is to enable users to obtain a base gentoo installation for various scenarios, ideally, in one command. Common use cases and their useful options will be detailed below.
+
+GentooImgr separates all the typical areas from the Gentoo Handbook into ``steps`` which can be called individually or collectively with an ``install``.
 
 Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for providing a foundation to work from.
 
@@ -15,9 +19,60 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 * Step system to enable user to continue off at the same place if a step fails
 * No heavy packages like rust included ** Cloud Init images do require rust, QEMU-only doesn't. (TODO)
 
+**IMPORTANT**: Gentoo with EFI and Cloud-Init configuration is buggy: https://github.com/canonical/cloud-init/issues/3999, it is not recommended at the moment.
 
-**IMPORTANT**: Gentoo with EFI and Cloud-Init configuration is buggy: https://github.com/canonical/cloud-init/issues/3999
+## Common Usage
 
+### QEMU:
+
+QEMU builds a virtual image file that can be run in a virtualized environment
+
+
+```sh
+git clone https://github.com/NucleaPeon/gentooimgr.git
+python -m gentooimgr build
+python -m gentooimgr run
+```
+
+Once the image is virtualized, within qemu mount the available gentooimgr iso and run the appropriate command:
+
+```sh
+mkdir -p /mnt/gi
+mount /dev/disk/by-label/gentooimgr /mnt/gi
+cd /mnt/gi
+python -m gentooimgr --config-cloud install
+python -m gentooimgr unchroot
+```
+
+...
+
+### Cloud-Image:
+
+Cloud-Image configures a qemu image that can be imported into network/kvm/hosting applications with direct ability to configure things such as hardware (network), passwords, ssh keys and more, sometimes without rebooting and makes administration outside of the virtualized environment very easy.
+
+...
+
+### PowerMac G5 Native Install:
+
+Important to note that the Gentoo minimal ppc cd does not include setuptools or pip, so I've included ``pyvenvex.py``, a very useful script that will download setuptools and pip for a virtual environment that gentooimgr can be installed into.
+
+(change ``-config-ppc-64`` to ``--config-ppc-32`` if you prefer a 32-bit configuration)
+
+
+```sh
+cd /root/gentooimgr
+python pyvenvex.py .
+bin/pip install -r requirements.txt .
+bin/python -m gentooimgr -N -I --config-ppc-64 install
+# Or use --config-ppc-32
+```
+
+PPC ignores the ``--use-efi``flag, as OpenFirmware already uses EFI and there's very little room to customize new world mac boot processes due to how particular they are.
+
+__NOTE__: Gentoo is currently having issues with ``genkernel`` and ``apmd``/``powermgmt-base`` packages that prevent this from being a single-command success for emerging packages. ``acpid`` requires an ``ACCEPT_KEYWORDS="**"`` env var or /etc/portage/package.accept_keywords/ entry to overcome this. I will be temporarily removing power management from the process.
+
+* genkernel: https://bugs.gentoo.org/show_bug.cgi?id=955278
+* powermgmt-base: https://bugs.gentoo.org/show_bug.cgi?id=955437
 
 
 ## Preface
@@ -51,41 +106,7 @@ Thanks!
 * [ ] progressbar for python (dev-python/progressbar2 package if running on gentoo)
 
 
-## Quick Start
-
-```sh
-git clone https://github.com/NucleaPeon/gentooimgr.git
-python -m gentooimgr build
-python -m gentooimgr run
-```
-
-Once qemu is running, mount the available gentooimgr iso and run the appropriate command:
-
-```sh
-mkdir -p /mnt/gi
-mount /dev/disk/by-label/gentooimgr /mnt/gi
-cd /mnt/gi
-python -m gentooimgr --config-cloud install
-python -m gentooimgr unchroot
-```
-
-## Quick Start Native PPC
-
-If installing your powerpc operating system, things are a touch more complicated. Download gentooimgr onto a usb stick or transfer via ssh/scp/rsync. Assume ``/root/gentooimgr`` is the path to this repo's contents.
-
-```sh
-cd /root/gentooimgr
-python pyvenvex.py .
-bin/pip install -r requirements.txt .
-bin/python -m gentooimgr -N -I --config-ppc-64 install
-# Or use --config-ppc-32
-```
-
-PPC ignores the ``--use-efi``flag, as OpenFirmware already uses EFI and there's very little room to customize new world mac boot processes due to how particular they are.
-
-### Using EFI
-
-This is slightly more complicated.
+## Using EFI
 
 Ensure you have ovmf installed. On Gentoo, the package name is ``sys-firmware/edk2-ovmf`` or ``sys-firmware/edk2-ovmf-bin``. the latter of which is brought in by ``app-emulation/qemu`` automatically. I prefer using the non-binary version, but I had to uninstall the binary package after qemu was built. The path for locating the firmware is ``/usr/share/edk2-ovmf/OVMF_CODE.fd``, it may be different for Debian-based systems. (Currently this can be set with the ``--efi-firmware`` command line option.)
 
@@ -120,7 +141,7 @@ Remove the serial options in the grub menu to get the login prompt. (Keep the ``
 
 
 
-### Configurations
+## Configurations
 
 * ``--config-cloud`` will bring in the required components to create a cloud-init image
 * ``--config-qemu`` will bring in the required components to create a qemu-enabled image, runnable in qemu or by calling ``python -m gentooimgr run [resulting-image.qcow2]``
@@ -178,7 +199,6 @@ During my testing and development of this project, I found a couple notable conc
 * Autoconf-wrapper was failing to emerge due to file collisions. I had to implement an ``-I /usr -I /etc`` option to get the build past the ``emerge @world`` step. My guess is autoconf had a new version but as a system tool, gentoo errs on the stability side of things.
 
 
-
 ## Adding Image to Proxmox
 
 (Use the correct username and address to ssh/scp)
@@ -211,8 +231,9 @@ qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-dis
 
 ## Updating Kernel
 
-Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel by default.
-The traditional ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
+Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel if 'genkernel' is found in your kernel packages. Otherwise it will build a ``gentoo-sources`` kernel. No downloading and configuring a kernel.org kernel yet.
+
+With genkernel, the ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
 If you plan on making your own changes to the kernel and having it built automatically, edit and save THAT file, instead of simply saving your menuconfig changes.
 
 Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``

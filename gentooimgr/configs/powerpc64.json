@@ -21,8 +21,12 @@
             }
         }
     },
+    "packages": {
+        "additional": [
+            "app-editors/vim"
+        ]
+    },
     "services": {
-        "acpid": "default"
     },
     "iso": null,
     "portage": null,
