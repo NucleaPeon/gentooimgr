@@ -289,6 +289,7 @@ def step11_kernel(args, cfg):
     LOG.info(f":: Step 11: {STEPS[11]}")
     run_cmd(args, ["eselect", "kernel", "set", "1"])
     if not args.kernel_dist and not args.pretend:
+        LOG.info(f":: \tStarting Kernel Build")
         gentooimgr.kernel.build_kernel(args, cfg, inchroot=not os.path.exists('/mnt/gentoo'))
 
     if args.parttype == "efi" and not args.pretend:

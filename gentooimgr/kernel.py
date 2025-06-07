@@ -91,11 +91,6 @@ def build_kernel(args, config, inchroot=False) -> int:
     LOG.info(f"\t:: Using kernel configuration {'default' if kernelconf is None else kernelconf}")
     if kernelconf is None:
         kernel_default_config(args, config)
-    # Using genkernel will save the config based on kernel version, so while we give it --kernel-config, output is /etc/kernels/kernel-[version]
-    # Assume we will want --virtio in all cases
-
-    # FIXME: genkernel shouldn't be default, will fail on ppc64. Detect if there's a kernel_url in json which will wget/download file,
-    # extract, and build.
 
     cmd = []
     has_genkernel = False
@@ -115,10 +110,7 @@ def build_kernel(args, config, inchroot=False) -> int:
     if not has_genkernel:
         chdir_kerneldir(args)
         shutil.copyfile(kernelconf, '.config')
-        cmd = ['make', 'oldconfig']  # Get config to work with new kernel
-        code, stdout, stderr = run_cmd(args, cmd)
-
-        for cmd in [['make'], ['make', 'modules'], ['make', 'modules_install'], ['make', 'install']]:
+        for cmd in [['make'], ['make', 'modules_install'], ['make', 'install']]:
             code, stdout, stderr = run_cmd(args, cmd)
 
     return code
