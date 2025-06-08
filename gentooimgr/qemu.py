@@ -96,7 +96,7 @@ def run_image(
         config.get("qemu_prog", c.GENTOO_CMD),
         "-enable-kvm" if config.get("enable_kvm", False) else "",
         "-m", str(config.get("memory", 2048)),
-        "-drive", f"file={image},if={"virtio" if c.ARCHITECTURE == "amd64" else "none"},index=0,format={ext}",
+        "-drive", f"file={image},if={'virtio' if c.ARCHITECTURE == 'amd64' else 'none'},index=0,format={ext}",
         "-net", "nic,model=virtio",
         "-net", "user",
         "-cpu", config.get("cpu"),
