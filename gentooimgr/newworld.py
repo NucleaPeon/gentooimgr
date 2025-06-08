@@ -2,9 +2,14 @@
 """
 import os
 import sys
-import pexpect
 import fcntl
 from gentooimgr.process import run
+from gentooimgr.logging import LOG
+
+try:
+    import pexpect
+except ImportError as iE:
+    LOG.error("pexpect is required for partitioning newworld mac drives")
 
 def calc_device_size(blockdev):
     # 512 block size in mac-fstab, 1024 in /proc/partitions!

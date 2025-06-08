@@ -38,7 +38,11 @@ def get_installed_kernel_config_path(args, config, inchroot):
     kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', 'etc', 'kernels', 'config.d') if not inchroot else os.path.join(os.sep, 'etc', 'kernels', 'config.d')
     LOG.info(f"Kernel dir {kerneldir}")
     # Explicitly prefer the supplied --config arg if given
-    return args.kconf or os.path.join(kerneldir, f'gentooimgr-{name}.config')
+    try:
+        kconf = args.kconf
+    except AttributeError as aE:
+        kconf = os.path.join(kerneldir, f'gentooimgr-{name}.config')
+    return kconf
 
 def kernel_copy_conf(args, config, inchroot=False) -> int:
     """Copies our *.config file into /etc/kernels/config.d/[name].config.
@@ -64,7 +68,7 @@ def kernel_copy_conf(args, config, inchroot=False) -> int:
 
     return code
 
-def chdir_kerneldir(args):
+def chdir_kerneldir(args, inchroot=False):
     kerneldir = args.kernel_dir
     LOG.info(f"Kernel dir {kerneldir}")
     if not inchroot:
@@ -85,7 +89,7 @@ def build_kernel(args, config, inchroot=False) -> int:
 
     kerneldir = args.kernel_dir
     LOG.info(f"Kernel dir {kerneldir}")
-    chdir_kerneldir(args)
+    chdir_kerneldir(args, inchroot=inchroot)
     # kernel_copy_conf needs to happen before this works correctly:
     kernelconf = get_installed_kernel_config_path(args, config, inchroot)
     LOG.info(f"\t:: Using kernel configuration {'default' if kernelconf is None else kernelconf}")

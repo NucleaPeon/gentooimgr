@@ -11,11 +11,15 @@ import re
 import sys
 from datetime import date
 import hashlib
-import progressbar
+from gentooimgr.logging import LOG
+try:
+    import progressbar
+except ImportError as iE:
+    LOG.error("Missing import: progressbar")
+
 from urllib.request import urlretrieve
 import tempfile
 import gentooimgr.config
-from gentooimgr.logging import LOG
 from gentooimgr.common import older_than_a_day
 
 hashpattern =    re.compile(gentooimgr.config.GENTOO_FILE_HASH_RE, re.MULTILINE)
@@ -29,15 +33,19 @@ class DownloadProgressBar():
         self.progress = None
 
     def __call__(self, block_num, block_size, total_size):
-        if not self.progress:
-            self.progress = progressbar.ProgressBar(maxval=total_size)
-            self.progress.start()
+        try:
+            if not self.progress:
+                self.progress = progressbar.ProgressBar(maxval=total_size)
+                self.progress.start()
 
-        downloaded = block_num * block_size
-        if downloaded < total_size:
-            self.progress.update(downloaded)
-        else:
-            self.progress.finish()
+            downloaded = block_num * block_size
+            if downloaded < total_size:
+                self.progress.update(downloaded)
+            else:
+                self.progress.finish()
+
+        except NameError as nE:
+            LOG.warn("Unable to use progressbar to show progress")
 
 def parse_latest_iso_text(fullpath) -> tuple:
     """Returns a tuple of (hash type, iso name, iso bytes)"""
@@ -96,9 +104,13 @@ def verify(args, _type: str, baseurl: str, hashpattern, filename: str) -> bool:
 
 def download_stage3(args, url=None, cfg={}) -> str:
     uname = cfg.get("architecture", os.uname().machine)
+    LOG.debug(f"download_stage3() with uname {uname}")
     if uname.startswith("ppc"):
         uname = "ppc"  # fix gentoo not having separate 32/64bit ppc urls/files
+    elif uname == "x86_64":
+        uname = "amd64"
     C = gentooimgr.config.config(architecture=uname)
+    LOG.debug(f"Config from architecture is {C}")
     if url is None:
         if not hasattr(args, "profile"):
             # Set this to either the config value or empty, defaulting it to openrc
