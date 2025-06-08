@@ -70,9 +70,12 @@ def load_default_config(config_name):
     """
     name, ext = os.path.splitext(config_name)
     if not name in gentooimgr.configs.KNOWN_CONFIGS:
+        LOG.warn(f"Name {name} not found in known configurations")
         return {}
 
-    with open(os.path.join(gentooimgr.configs.CONFIG_DIR, config_name), 'r') as f:
+    path = os.path.join(gentooimgr.configs.CONFIG_DIR, config_name)
+    LOG.debug(f"Expects a config at {path}")
+    with open(path, 'r') as f:
         return json.loads(f.read())
 
 
