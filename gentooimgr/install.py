@@ -13,43 +13,88 @@ import gentooimgr.config
 import gentooimgr.configs
 import gentooimgr.common
 import gentooimgr.chroot
+import gentooimgr.download
 import gentooimgr.kernel
 import gentooimgr.errorcodes
-from gentooimgr.process import run_cmd
+import gentooimgr.newworld
+from gentooimgr.process import run_cmd, run
 from gentooimgr import HERE
 from gentooimgr.logging import LOG
 
 from gentooimgr.configs import *
 
 FILES_DIR = os.path.join(HERE, "..")
-LAST_STEP = 18
+
+STEPS = {
+    1: "Disk Preparation",
+    2: "Mounting",
+    3: "Stage3 Tarball",
+    4: "Binding Filesystems",
+    5: "Portage",
+    6: "Licenses",
+    7: "Repo Configuration",
+    8: "Resolv",
+    9: "Emerge Sync",
+    10: "Emerge Packages",
+    11: "Kernel",
+    12: "Grub",
+    13: "Serial",
+    14: "Networking",
+    15: "Services",
+    16: "Sysconfig",
+    17: "/etc/fstab",
+    18: "Setting Passwords"
+}
+
+LAST_STEP = max(STEPS.keys())
 
 def step1_diskprep(args, cfg):
-    LOG.info(":: Step 1: Disk Preparation")
+    LOG.info(f":: Step 1: {STEPS[1]}")
     # http://rainbow.chard.org/2013/01/30/how-to-align-partitions-for-best-performance-using-parted/
     # http://honglus.blogspot.com/2013/06/script-to-automatically-partition-new.html
     cmds = []
-    partnum = 1
-    if args.parttype == "efi":
+    partnum = cfg.get("partition_start", 1)
+    if args.new_world_mac:
+        # do a completely different partitioning process
+        LOG.info("Setting up New World Mac partitioning scheme")
+        # Detect if fdisk-mac exists
+        code, o, e = run(["mac-fdisk", "-l"])
+        if code != 0:
+            LOG.error("mac-fdisk program not found, cannot continue")
+            return
+
+        if not args.pretend:
+            gentooimgr.newworld.write_partition(cfg.get("disk"))
+
         cmds.extend([
-            ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
-            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on'],
-            ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
+            ['mkfs.ext2', f'{cfg.get("disk")}{partnum}'],
+            ['mkswap', f'{cfg.get("disk")}{partnum+1}'],
+            ['echo', '\"Creating the ext4 filesystem may take a long time...\"'],
+            ['mkfs.ext4', f'{cfg.get("disk")}{partnum+2}']
         ])
-        partnum += 1
 
     else:
-        cmds.append(['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "msdos"])
+        if args.parttype == "efi":
+            cmds.extend([
+                ['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "GPT"],
+                ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', 'fat32', '1MiB', '321MiB'],
+                ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'boot', 'on'],
+                ['parted', '-s', f'{cfg.get("disk")}', 'set', str(partnum), 'esp', 'on']
+            ])
+            partnum += 1
 
-    cmds.extend([
-        ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '321MiB', '100%'], # is 2048s correct?
-        ['partprobe'],
-        ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{partnum}']
-    ])
-    partnum += 1  # in case we use this later, reflect partition number to use next.
-    if args.parttype == "efi":
-        cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
+        else:
+            cmds.append(['parted', '-s', f'{cfg.get("disk")}', 'mklabel', "msdos"])
+
+        cmds.extend([
+            ['parted', '-s', f'{cfg.get("disk")}', 'mkpart', 'primary', '321MiB', '100%'], # is 2048s correct?
+            ['partprobe'],
+            # -FF forces even if mounted, dangerous.
+            ['mkfs.ext4', '-FF', f'{cfg.get("disk")}{partnum}']
+        ])
+        partnum += 1  # in case we use this later, reflect partition number to use next.
+        if args.parttype == "efi":
+            cmds.append(['mkfs.vfat', '-F32', '-n', 'EFI', f'{cfg.get("disk")}1'])
 
     for c in cmds:
         run_cmd(args, c, stdout=PIPE, stderr=PIPE)
@@ -57,11 +102,11 @@ def step1_diskprep(args, cfg):
     completestep(args, 1, "diskprep")
 
 def step2_mount(args, cfg):
-    LOG.info(f":: Step 2: Mounting {gentooimgr.config.GENTOO_MOUNT}")
+    LOG.info(f":: Step 2: {STEPS[2]} {gentooimgr.config.GENTOO_MOUNT}")
 
-    partnum = 1
     cmd = []
-    if args.parttype == "efi":
+    partnum = cfg.get("partition_start")
+    if args.parttype == "efi" and not args.new_world_mac:
         cmd.extend([
             ["mount", f'{cfg.get("disk")}{partnum+1}', f"{cfg.get('mountpoint')}"],
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi"],
@@ -69,6 +114,8 @@ def step2_mount(args, cfg):
             ["mkdir", "-p", f"{cfg.get('mountpoint')}/boot/efi/EFI/BOOT/"]
         ])
     else:
+        if args.new_world_mac:
+            partnum = partnum + 2  # /dev/sda3 is boot/start of partition, /dev/sda5 is rootfs
         cmd.append(["mount", f'{cfg.get("disk")}{partnum}', f"{cfg.get('mountpoint')}"])
 
     for c in cmd:
@@ -76,24 +123,30 @@ def step2_mount(args, cfg):
     completestep(args, 2, "mount")
 
 def step3_stage3(args, cfg):
-    LOG.info(f":: Step 3: Stage3 Tarball")
+    LOG.info(f":: Step 3: {STEPS[3]}")
+    if args.install_only:
+        # download stage3 to FILES_DIR
+        gentooimgr.download.download_stage3(args, cfg=cfg)
     stage3 = cfg.get("stage3") or args.stage3  # FIXME: auto detect stage3 images in mountpoint and add here
     if not stage3:
         stage3 = gentooimgr.common.stage3_from_dir(FILES_DIR)
 
-    LOG.info(f"\t:: Stage 3 file selected: {stage3}")
+    LOG.info(f":: Stage 3 file selected: {stage3}")
     cmd = ["tar", "xpf", os.path.abspath(stage3), "--xattrs-include='*.*'", "--numeric-owner", "-C",
                   f'{cfg.get("mountpoint")}']
     run_cmd(args, cmd)
     completestep(args, 3, "stage3")
 
 def step4_binds(args, cfg):
-    LOG.info(':: Step 4: Binding Filesystems')
+    LOG.info(f':: Step 4: {STEPS[4]}')
     if not args.pretend: gentooimgr.chroot.bind(verbose=args.debug)
     completestep(args, 4, "binds")
 
 def step5_portage(args, cfg):
-    LOG.info(':: Step 5: Portage')
+    LOG.info(f':: Step 5: {STEPS[5]}')
+    if args.install_only:
+        # download stage3 to FILES_DIR
+        gentooimgr.download.download_portage(args, cfg=cfg)
     portage = cfg.get("portage") or args.portage
     if not portage:
         portage = gentooimgr.common.portage_from_dir(FILES_DIR)
@@ -116,17 +169,18 @@ def step5_portage(args, cfg):
     completestep(args, 5, "portage")
 
 def step6_licenses(args, cfg):
-    LOG.info(':: Step 6: Licenses')
+    LOG.info(f':: Step 6: {STEPS[6]}')
     license_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'package.license')
     os.makedirs(license_path, exist_ok=True)
     for f, licenses in cfg.get("licensefiles", {}).items():
         LOG.info(f"\t:: Writing {f} license file")
         with open(os.path.join(license_path, f), 'w') as f:
             f.write('\n'.join(licenses))
+            f.write("\n")
     completestep(args, 6, "license")
 
 def step7_repos(args, cfg):
-    LOG.info(':: Step 7: Repo Configuration')
+    LOG.info(f':: Step 7: {STEPS[7]}')
     repo_path = os.path.join(cfg.get("mountpoint"), 'etc', 'portage', 'repos.conf')
     if not args.pretend: os.makedirs(repo_path, exist_ok=True)
     # Copy from template
@@ -154,10 +208,13 @@ def step7_repos(args, cfg):
     completestep(args, 7, "repos")
 
 def step8_resolv(args, cfg):
-    LOG.info(f':: Step 8: Resolv')
+    LOG.info(f':: Step 8: {STEPS[8]}')
     if not os.path.exists(cfg.get("mountpoint")):
         return
     run_cmd(args, ["cp", "--dereference", "/etc/resolv.conf", os.path.join(cfg.get("mountpoint"), 'etc')])
+    if args.new_world_mac:
+        #FIXME: This is test code and shouldn't be used in release.
+        run_cmd(args, ["cp", "--dereference", os.path.join(os.path.abspath(__file__), "configs", "powerpc64.make.conf"), os.path.join(cfg.get("mountpoint"), 'etc', 'make.conf')])
     # Copy all step files and python module to new chroot
     if not args.pretend:
         os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
@@ -165,7 +222,7 @@ def step8_resolv(args, cfg):
     completestep(args, 8, "resolv")
 
 def step9_sync(args, cfg):
-    LOG.info(f":: Step 9: sync")
+    LOG.info(f":: Step 9: {STEPS[9]}")
     os.chdir(os.sep)
     env = os.environ
     if args.ignore_collisions:
@@ -179,7 +236,13 @@ def step9_sync(args, cfg):
     completestep(args, 9, "sync")
 
 def step10_emerge_pkgs(args, cfg):
-    LOG.info(f":: Step 10: emerge pkgs")
+    LOG.info(f":: Step 10: {STEPS[10]}")
+    if args.new_world_mac:
+        #FIXME: This is test code and shouldn't be used in release.
+        run_cmd(args, ["cp", "-vf", os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                 "configs",
+                                                 "powerpc64.make.conf"),
+                        os.path.join(cfg.get("mountpoint"), 'etc', 'make.conf')])
     packages = cfg.get("packages", {})
     env = os.environ
     if args.ignore_collisions:
@@ -223,9 +286,10 @@ def step10_emerge_pkgs(args, cfg):
 
 def step11_kernel(args, cfg):
     # at this point, genkernel will be installed. Please note that configuration files must be copied before this point
-    LOG.info(f":: Step 11: kernel")
+    LOG.info(f":: Step 11: {STEPS[11]}")
     run_cmd(args, ["eselect", "kernel", "set", "1"])
     if not args.kernel_dist and not args.pretend:
+        LOG.info(f":: \tStarting Kernel Build")
         gentooimgr.kernel.build_kernel(args, cfg, inchroot=not os.path.exists('/mnt/gentoo'))
 
     if args.parttype == "efi" and not args.pretend:
@@ -244,7 +308,7 @@ def step11_kernel(args, cfg):
     completestep(args, 11, "kernel")
 
 def step12_grub(args, cfg):
-    LOG.info(f":: Step 12: kernel")
+    LOG.info(f":: Step 12: {STEPS[12]}")
     cmd = ["grub-install"]
     if args.parttype == "efi":
         cmd += ["--target=x86_64-efi", '--efi-directory=/boot/efi']
@@ -275,14 +339,14 @@ def step12_grub(args, cfg):
     completestep(args, 12, "grub")
 
 def step13_serial(args, cfg):
-    LOG.info(f":: Step 13: Serial")
+    LOG.info(f":: Step 13: {STEPS[13]}")
     if cfg.get("serial") and not args.pretend:
         os.system("sed -i 's/^#s0:/s0:/g' /etc/inittab")
         os.system("sed -i 's/^#s1:/s1:/g' /etc/inittab")
     completestep(args, 13, "serial")
 
 def step14_networking(args, cfg):
-    LOG.info(f":: Step 14: Services")
+    LOG.info(f":: Step 14: {STEPS[14]}")
     os.chdir('/etc/init.d')
     os.symlink('net.lo', 'net.eth0')
     # link /etc/init.d/net.lo ->/etc/init.d/net.eth0
@@ -291,7 +355,7 @@ def step14_networking(args, cfg):
     completestep(args, 14, "networking")
 
 def step15_services(args, cfg):
-    LOG.info(f":: Step 15: Services")
+    LOG.info(f":: Step 15: {STEPS[15]}")
     services = args.services or []
     services += cfg.get("services", [])
     for service in services:
@@ -302,7 +366,7 @@ def step15_services(args, cfg):
     completestep(args, 15, "services")
 
 def step16_sysconfig(args, cfg):
-    LOG.info(f":: Step 16: Sysconfig")
+    LOG.info(f":: Step 16: {STEPS[16]}")
     if not args.pretend:
         with open("/etc/timezone", "w") as f:
             f.write("UTC")
@@ -349,13 +413,21 @@ def step16_sysconfig(args, cfg):
     completestep(args, 16, "sysconfig")
 
 def step17_fstab(args, cfg):
-    LOG.info(f":: Step 17: fstab")
+    LOG.info(f":: Step 17: {STEPS[17]}")
     partition = 1
     if not args.pretend:
         with open(os.path.join(os.sep, 'etc', 'fstab'), 'a') as fstab:
             if args.parttype == "efi":
                 fstab.write(f"{cfg.get('disk')}{partition}\t/boot\tvfat\tnoatime\t1 2\n")
                 partition += 1
+
+            if args.new_world_mac:
+                partition = cfg.get("partition_start", 3)
+                fstab.write(f"{cfg.get('disk')}{partition}\t/boot\text2\tnoatime\t1 2\n")
+                partition += 1
+                fstab.write(f"{cfg.get('disk')}{partition}\tnone\tswap\tsw\t0 0\n")
+                partition += 1
+
             fstab.write(f"{cfg.get('disk')}{partition}\t/\text4\tdefaults,noatime\t0 1\n")
 
     completestep(args, 17, "fstab")
@@ -364,7 +436,7 @@ def step18_passwd(args, cfg):
     """Keep in mind that users that do not exist but have passwords may silently fail.
     If a user is not in /etc/shadow, the sed command will fail.
     """
-    LOG.info(f":: Step 18: Setting Root Password")
+    LOG.info(f":: Step 18: {STEPS[18]}")
     passwords = cfg.get("passwords", {})
     if passwords and not args.pretend:
         shutil.copyfile("/etc/shadow", "/root/shadow.bak")
@@ -396,8 +468,6 @@ def step18_passwd(args, cfg):
     completestep(args, 18, "passwords")
 
 def completestep(args, step, stepname, prefix='/tmp'):
-    if args.step_prompt:
-        input("Step Prompt: Press <Enter> to continue")
     if args.pretend:
         return
     with open(os.path.join(prefix, f"{step}.step"), 'w') as f:
@@ -433,6 +503,21 @@ def prechroot(args, cfg):
     exists = os.path.exists(cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH))
     LOG.info(f"\t::Kernel configuration exists: {exists}")
 
+def chrootfunc(args, cfg):
+    # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
+    if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
+        LOG.info(":: Binding and Mounting, Entering CHROOT")
+        if not os.path.exists('/mnt/gentoo') and args.force or args.pretend:
+            LOG.info(":: Using --force or --pretend, no /mnt/gentoo found so skipping chroot")
+
+        else:
+            prechroot(args, cfg)
+            gentooimgr.chroot.bind()
+            os.chdir(os.sep)
+            os.chroot(cfg.get("mountpoint"))
+
+        os.chdir(os.sep)
+
 def configure(args, config: dict) -> int:
     # Load configuration
     if not os.path.exists(gentooimgr.config.GENTOO_MOUNT):
@@ -458,19 +543,8 @@ def configure(args, config: dict) -> int:
     if not stepdone(7): step7_repos(args, cfg)
     # portage env files and resolv.conf
     if not stepdone(8): step8_resolv(args, cfg)
-    # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:
-    if os.path.exists(gentooimgr.config.GENTOO_MOUNT):
-        LOG.info(":: Binding and Mounting, Entering CHROOT")
-        if not os.path.exists('/mnt/gentoo') and args.force or args.pretend:
-            LOG.info(":: Using --force or --pretend, no /mnt/gentoo found so skipping chroot")
 
-        else:
-            prechroot(args, cfg)
-            gentooimgr.chroot.bind()
-            os.chdir(os.sep)
-            os.chroot(config.get("mountpoint"))
-
-        os.chdir(os.sep)
+    chrootfunc(args, cfg)
 
     # emerge --sync
     if not stepdone(9): step9_sync(args, cfg)
@@ -498,7 +572,31 @@ def configure(args, config: dict) -> int:
     if not stepdone(18): step18_passwd(args, cfg)
     # copy cloud cfg?
     if not args.pretend: gentooimgr.chroot.unbind()
+
+    LOG.info(":: Install process complete.")
     # Finish install processes like emaint and eix-update and news read
     return gentooimgr.errorcodes.SUCCESS
 
 
+
+STEP_FUNCS = {
+    1: step1_diskprep,
+    2: step2_mount,
+    3: step3_stage3,
+    4: step4_binds,
+    5: step5_portage,
+    6: step6_licenses,
+    7: step7_repos,
+    8: step8_resolv,
+    9: step9_sync,
+    10: step10_emerge_pkgs,
+    11: step11_kernel,
+    12: step12_grub,
+    13: step13_serial,
+    14: step14_networking,
+    15: step15_services,
+    16: step16_sysconfig,
+    17: step17_fstab,
+    18: step18_passwd,
+    'chroot': chrootfunc
+}

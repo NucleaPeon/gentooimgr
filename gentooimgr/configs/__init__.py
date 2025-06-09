@@ -11,7 +11,8 @@ KNOWN_CONFIGS = [
     "qemu",
     "ppcbase",
     "powerpc32",
-    "powerpc64"
+    "powerpc64",
+    "arm"
 ]
 
 # Currently we handle the writing of additional files by having data defined here and checking options.

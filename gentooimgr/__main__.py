@@ -9,7 +9,7 @@ import gentooimgr.config
 import gentooimgr.configs
 import gentooimgr.errorcodes
 import gentooimgr.logging
-
+from gentooimgr.install import STEPS, LAST_STEP
 
 def main(args):
     '''Gentoo Cloud Image Builder Utility'''
@@ -64,6 +64,10 @@ def main(args):
         import gentooimgr.kernel
         code = gentooimgr.kernel.build_kernel(args, configjson, inchroot=not os.path.exists("/mnt/gentoo"))
 
+    elif args.action == "step":
+        import gentooimgr.steps
+        code = gentooimgr.steps.run_step(args, configjson, *args.steps)
+
     return code
 
 if __name__ == "__main__":
@@ -84,12 +88,16 @@ if __name__ == "__main__":
                         help="Use a 32-bit PowerPC qemu configuration")
     parser.add_argument("--config-ppc-64", action="store_const", const="powerpc64.json", dest="config",
                         help="Use a 64-bit PowerPC qemu configuration")
+    parser.add_argument("--config-arm", action="store_const", const="arm.json", dest="config",
+                        help="Use an ARM qemu configuration")
     parser.add_argument("-y", "--days", type=int, default=gentooimgr.config.DAYS,
                         help="Number of days before the files are redownloaded")
     parser.add_argument("--use-efi", action="store_const", const="efi", dest="parttype",
                         help="Enable EFI for the resulting gentoo image partition type. If not set, is autodetected.")
     parser.add_argument("--use-mbr", action="store_const", const="mbr", dest="parttype",
                         help="Enable MBR for the resulting gentoo image partition type If not set, is autodetected.")
+    parser.add_argument("-N", "--new-world-mac", action="store_true",
+                        help="Handles specifics regarding Apple (TM) partioning schemes and OpenFirmware")
     # currently only pretends for install and maybe some kernel action. FIXME
     parser.add_argument("--pretend", action="store_true", help="Log commands instead of running them, no chrooting")
 
@@ -120,12 +128,16 @@ if __name__ == "__main__":
                                help="Where kernel is specified. By default uses the active linux kernel")
     parser.add_argument("--kernel-dist", action="store_true",
                         help="Use a distribution kernel in the installation. Overrides all other kernel options.")
+    parser.add_argument("-I", "--install-only", action="store_true",
+                        help="Downloads files such as stage3 and portage during install phase instead of expecting it at build")
+    parser.add_argument("--ignore-collisions", nargs="+",
+                        help="A list of paths that emerge will ignore collisions on. Only set if needed.")
     subparsers = parser.add_subparsers(help="gentooimgr actions", dest="action")
     subparsers.required = True
 
     # Build action
     parser_build = subparsers.add_parser('build', help="Download and verify all the downloaded components for cloud image")
-    parser_build.add_argument("image", default=gentooimgr.config.GENTOO_IMG_NAME, type=str, nargs='?',
+    parser_build.add_argument("image", default="gentoo.qcow2", type=str, nargs='?',
                               help="Specify the exact image (date) you want to build; ex: 20231112T170154Z. Defaults to downloading the latest image. If image exists, will automatically use that one instead of checking online.")
     parser_build.add_argument("--size", default="12G", help="Size of image to build")
     parser_build.add_argument("--no-verify", dest="verify", action="store_false", help="Do not verify downloaded iso")
@@ -151,6 +163,9 @@ if __name__ == "__main__":
 
     parser_clean = subparsers.add_parser('clean', help="Remove all downloaded files")
     # --force also applies to clean action
+
+    parser_step = subparsers.add_parser('step', help="Invoke an individual step")
+    parser_step.add_argument("steps", nargs="+", default=(), type=int, help=f"Steps 0-{LAST_STEP}")
 
     parser_status = subparsers.add_parser('status', help="Review information, downloaded images and configurations")
 
@@ -190,7 +205,7 @@ if __name__ == "__main__":
     parser_shrink.add_argument("--only-convert", action="store_true",
                                help="Convert and exit, do not attempt to shrink the image.")
     parser_kernel = subparsers.add_parser('kernel', help="Build the kernel based on configuration and optional --kernel-dist flag.")
-
+    parser_kernel.add_argument("--kconf", nargs="?", help="Specify which kernel configuration file to build with")
 
     args = parser.parse_args()
     gentooimgr.logging.set_logger(args)  # Pulls out logging parameters to configure logging for any process.

@@ -34,8 +34,15 @@ def get_installed_kernel_config_path(args, config, inchroot):
     We prepend 'gentooimgr' for explicit readability.
     """
     name = get_kernel_config_name(args, config)
+    LOG.info(f"Kernel name {name}")
     kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', 'etc', 'kernels', 'config.d') if not inchroot else os.path.join(os.sep, 'etc', 'kernels', 'config.d')
-    return os.path.join(kerneldir, f'gentooimgr-{name}.config')
+    LOG.info(f"Kernel dir {kerneldir}")
+    # Explicitly prefer the supplied --config arg if given
+    try:
+        kconf = args.kconf
+    except AttributeError as aE:
+        kconf = os.path.join(kerneldir, f'gentooimgr-{name}.config')
+    return kconf
 
 def kernel_copy_conf(args, config, inchroot=False) -> int:
     """Copies our *.config file into /etc/kernels/config.d/[name].config.
@@ -61,6 +68,15 @@ def kernel_copy_conf(args, config, inchroot=False) -> int:
 
     return code
 
+def chdir_kerneldir(args, inchroot=False):
+    kerneldir = args.kernel_dir
+    LOG.info(f"Kernel dir {kerneldir}")
+    if not inchroot:
+        if kerneldir[0] == os.sep:
+            kerneldir = kerneldir[1:] # remove '/' from
+        kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', kerneldir)
+    os.chdir(kerneldir)
+
 def build_kernel(args, config, inchroot=False) -> int:
     code = gentooimgr.errorcodes.SUCCESS
     if args.kernel_dist:
@@ -72,21 +88,35 @@ def build_kernel(args, config, inchroot=False) -> int:
         return code
 
     kerneldir = args.kernel_dir
-    if not inchroot:
-        if kerneldir[0] == os.sep:
-            kerneldir = kerneldir[1:] # remove '/' from
-        kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', kerneldir)
-    os.chdir(kerneldir)
+    LOG.info(f"Kernel dir {kerneldir}")
+    chdir_kerneldir(args, inchroot=inchroot)
     # kernel_copy_conf needs to happen before this works correctly:
     kernelconf = get_installed_kernel_config_path(args, config, inchroot)
     LOG.info(f"\t:: Using kernel configuration {'default' if kernelconf is None else kernelconf}")
     if kernelconf is None:
         kernel_default_config(args, config)
-    # Using genkernel will save the config based on kernel version, so while we give it --kernel-config, output is /etc/kernels/kernel-[version]
-    # Assume we will want --virtio in all cases
-    cmd = ['genkernel', f'--kernel-config={kernelconf}', '--bootdir=/boot/efi', '--no-menuconfig', '--virtio', 'all']
-    code, stdout, stderr = run_cmd(args, cmd)
-    # kernel_save_code = gentooimgr.errorcodes.PROCESS_FAILEDconfig(args, config) # Kernel config is saved with genkernel
+
+    cmd = []
+    has_genkernel = False
+    for pkg in config.get("packages", {}).get("kernel", []):
+        if "genkernel" in pkg:
+            has_genkernel = True
+            cmd = ['genkernel', f'--kernel-config={kernelconf}', '--no-menuconfig']
+
+            if args.parttype == "efi":
+                cmd.append( '--bootdir=/boot/efi' )
+            if config.get("vga", "") == "virtio":
+                cmd.append(  '--virtio' )
+
+            cmd.append("all")
+            code, stdout, stderr = run_cmd(args, cmd)
+
+    if not has_genkernel:
+        chdir_kerneldir(args)
+        shutil.copyfile(kernelconf, '.config')
+        for cmd in [['make'], ['make', 'modules_install'], ['make', 'install']]:
+            code, stdout, stderr = run_cmd(args, cmd)
+
     return code
 
 def kernel_default_config(args, config):

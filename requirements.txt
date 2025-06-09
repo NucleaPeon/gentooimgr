@@ -1,2 +1,4 @@
-pydantic
+# Use pydantic version that doesn't depend on rust compiler to exist
+pydantic==1.10.8
 progressbar
+pexpect

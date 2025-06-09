@@ -27,7 +27,6 @@
             "syslog-ng",
             "dhcpcd",
             "mlocate",
-            "xfsprogs",
             "dosfstools",
             "sudo",
             "postfix",
@@ -43,10 +42,12 @@
             "pciutils",
             "logrotate",
             "gptfdisk",
-            "sys-block/gpart",
             "net-fs/nfs-utils",
             "linux-firmware",
-            "sys-fs/hfsutils"
+            "sys-fs/hfsutils",
+            "sys-fs/mac-fdisk",
+            "sys-apps/pciutils",
+            "sys-apps/usbutils"
         ],
         "additional": [
             "app-editors/vim"
@@ -65,8 +66,6 @@
             "sys-boot/grub:2"
         ],
         "kernel": [
-            "sys-kernel/genkernel",
-            "gentoo-sources",
             "gentoolkit"
         ]
     },

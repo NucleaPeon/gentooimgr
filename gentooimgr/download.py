@@ -11,33 +11,41 @@ import re
 import sys
 from datetime import date
 import hashlib
-import progressbar
+from gentooimgr.logging import LOG
+try:
+    import progressbar
+except ImportError as iE:
+    LOG.error("Missing import: progressbar")
+
 from urllib.request import urlretrieve
 import tempfile
-import gentooimgr.config as config
-from gentooimgr.logging import LOG
+import gentooimgr.config
 from gentooimgr.common import older_than_a_day
 
-hashpattern =    re.compile(config.GENTOO_FILE_HASH_RE, re.MULTILINE)
-isopattern =     re.compile(config.GENTOO_FILE_ISO_RE, re.MULTILINE)
-isohashpattern = re.compile(config.GENTOO_FILE_ISO_HASH_RE, re.MULTILINE)
-stage3pattern  = re.compile(config.GENTOO_FILE_STAGE3_RE, re.MULTILINE)
-stage3hashpattern = re.compile(config.GENTOO_FILE_STAGE3_HASH_RE, re.MULTILINE)
+hashpattern =    re.compile(gentooimgr.config.GENTOO_FILE_HASH_RE, re.MULTILINE)
+isopattern =     re.compile(gentooimgr.config.GENTOO_FILE_ISO_RE, re.MULTILINE)
+isohashpattern = re.compile(gentooimgr.config.GENTOO_FILE_ISO_HASH_RE, re.MULTILINE)
+stage3pattern  = re.compile(gentooimgr.config.GENTOO_FILE_STAGE3_RE, re.MULTILINE)
+stage3hashpattern = re.compile(gentooimgr.config.GENTOO_FILE_STAGE3_HASH_RE, re.MULTILINE)
 
 class DownloadProgressBar():
     def __init__(self):
         self.progress = None
 
     def __call__(self, block_num, block_size, total_size):
-        if not self.progress:
-            self.progress = progressbar.ProgressBar(maxval=total_size)
-            self.progress.start()
+        try:
+            if not self.progress:
+                self.progress = progressbar.ProgressBar(maxval=total_size)
+                self.progress.start()
 
-        downloaded = block_num * block_size
-        if downloaded < total_size:
-            self.progress.update(downloaded)
-        else:
-            self.progress.finish()
+            downloaded = block_num * block_size
+            if downloaded < total_size:
+                self.progress.update(downloaded)
+            else:
+                self.progress.finish()
+
+        except NameError as nE:
+            LOG.warn("Unable to use progressbar to show progress")
 
 def parse_latest_iso_text(fullpath) -> tuple:
     """Returns a tuple of (hash type, iso name, iso bytes)"""
@@ -94,18 +102,28 @@ def verify(args, _type: str, baseurl: str, hashpattern, filename: str) -> bool:
         else:
             assert hd == _hash, f"Hash mismatch {hd} != {_hash}, use --force to bypass"
 
-def download_stage3(args, url=None) -> str:
+def download_stage3(args, url=None, cfg={}) -> str:
+    uname = cfg.get("architecture", os.uname().machine)
+    LOG.debug(f"download_stage3() with uname {uname}")
+    if uname.startswith("ppc"):
+        uname = "ppc"  # fix gentoo not having separate 32/64bit ppc urls/files
+    elif uname == "x86_64":
+        uname = "amd64"
+    C = gentooimgr.config.config(architecture=uname)
+    LOG.debug(f"Config from architecture is {C}")
     if url is None:
+        if not hasattr(args, "profile"):
+            # Set this to either the config value or empty, defaulting it to openrc
+            args.profile = cfg.get("initsys")
         if args.profile == "systemd":
-            url = os.path.join(config.GENTOO_BASE_STAGE_SYSTEMD_URL, config.GENTOO_LATEST_STAGE_SYSTEMD_FILE)
+            url = os.path.join(C.GENTOO_BASE_STAGE_SYSTEMD_URL, C.GENTOO_LATEST_STAGE_SYSTEMD_FILE)
 
         else:
-            url = os.path.join(config.GENTOO_BASE_STAGE_OPENRC_URL, config.GENTOO_LATEST_STAGE_OPENRC_FILE)
+            url = os.path.join(C.GENTOO_BASE_STAGE_OPENRC_URL, C.GENTOO_LATEST_STAGE_OPENRC_FILE)
 
     filename = os.path.basename(url)
     fullpath = os.path.join(args.download_dir, filename)
     if not os.path.exists(fullpath) or args.redownload or older_than_a_day(fullpath):
-        print(f"Downloading {filename}")
         urlretrieve(url, fullpath, DownloadProgressBar())
 
     hashtype, latest, size = parse_latest_stage3_text(fullpath)
@@ -114,22 +132,21 @@ def download_stage3(args, url=None) -> str:
     filename = latest
     fullpath = os.path.join(args.download_dir, filename)
     if not os.path.exists(fullpath) or args.redownload:
-        print(f"Downloading {filename}")
         url = os.path.join(
-                config.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
-                config.GENTOO_BASE_STAGE_OPENRC_URL,
+                C.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
+                C.GENTOO_BASE_STAGE_OPENRC_URL,
                 filename)
         urlretrieve(url, fullpath, DownloadProgressBar())
 
     # Verify byte size
     stage3size = os.path.getsize(fullpath)
     assert size == stage3size, f"Stage 3 size {size} does not match expected value {stage3size}."
-    verify(args, hashtype, config.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
-           config.GENTOO_BASE_STAGE_OPENRC_URL,  stage3hashpattern, filename)
+    verify(args, hashtype, C.GENTOO_BASE_STAGE_SYSTEMD_URL if args.profile == "systemd" else \
+           C.GENTOO_BASE_STAGE_OPENRC_URL,  stage3hashpattern, filename)
     return fullpath
 
 
-def download_portage(args, url=None) -> str:
+def download_portage(args, url=None, cfg={}) -> str:
     """Handle downloading of portage system for installation into cloud image
 
     We always download the latest portage package and rename it to today's date.
@@ -139,8 +156,12 @@ def download_portage(args, url=None) -> str:
 
 
     """
+    uname = cfg.get("architecture", os.uname().machine)
+    if uname.startswith("ppc"):
+        uname = "ppc"  # fix gentoo not having separate 32/64bit ppc urls/files
+    C = gentooimgr.config.config(architecture=uname)
     if url is None:
-        url = config.GENTOO_PORTAGE_FILE
+        url = C.GENTOO_PORTAGE_FILE
 
     base = os.path.basename(url)  # Uses 'latest' filename
     today = date.today()
@@ -155,10 +176,11 @@ def download_portage(args, url=None) -> str:
     return fullpath
 
 
-def download(args, url=None) -> str:
+def download(args, config, url=None) -> str:
     """Download txt file with iso name and hash type
     :Parameters:
         - args: Namespace with parsed arguments
+        - config: Namespace of configurations from gentooimgr.config.config()
         - url: str or None. If None, will generate a url to the latest minimal install iso
 
     :Returns:

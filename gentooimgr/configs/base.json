@@ -1,5 +1,8 @@
 {
+    "architecture": "amd64",
     "inherit": null,
+    "smp": true,
+    "cpu": "kvm64",
     "imgsize": "20G",
     "memory": 4096,
     "enable_kvm": true,
@@ -78,5 +81,7 @@
     "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": "/dev/sda"
+    "disk": "/dev/sda",
+    "partition_start": 1,
+    "partition_root": 1
 }

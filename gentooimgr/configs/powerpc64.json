@@ -1,4 +1,5 @@
 {
+    "architecture": "ppc64",
     "inherit": "ppcbase.json",
     "imgsize": "20G",
     "memory": 4096,
@@ -11,7 +12,7 @@
     },
     "kernel": {
         "path": "/etc/kernels/config.d/gentooimgr-base.config",
-        "config": "powerpc32.config"
+        "config": "powerpc64.config"
     },
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
@@ -20,11 +21,16 @@
             }
         }
     },
+    "packages": {
+        "additional": [
+            "app-editors/vim"
+        ]
+    },
     "services": {
-        "acpid": "default"
     },
     "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": "/dev/sda"
+    "disk": "/dev/sda",
+    "partition_start": 3
 }

@@ -1,17 +1,28 @@
 {
+    "architecture": "arm",
     "inherit": null,
-    "imgsize": "12G",
-    "memory": 4096,
-    "enable_kvm": true,
+    "iso": "/home/raven/Downloads/ubuntu-24.04.2-live-server-arm64.iso",
+    "imgsize": "20G",
+    "machine": "raspi1ap",
+    "vga": "std",
+    "smp": false,
+    "cpu": "arm1176",
+    "memory": 512,
     "mountpoint": "/mnt/gentoo",
     "imagename": null,
     "initsys": "openrc",
     "licensefiles": {
         "kernel": ["sys-kernel/linux-firmware linux-fw-redistributable"]
     },
+    "kernel": {
+        "path": "/etc/kernels/config.d/gentooimgr-qemu.config",
+        "config": "qemu.config"
+    },
     "repos": {
         "/etc/portage/repos.conf/gentoo.conf": {
-            "sync-uri": "rsync://192.168.254.20/gentoo-portage"
+            "gentoo": {
+
+            }
         }
     },
     "packages": {
@@ -19,14 +30,12 @@
             "acpid",
             "dmidecode",
             "syslog-ng",
-            "cronie",
             "dhcpcd",
             "mlocate",
             "xfsprogs",
             "dosfstools",
             "sudo",
             "postfix",
-            "app-editors/vim",
             "parted",
             "portage-utils",
             "bash-completion",
@@ -36,15 +45,17 @@
             "dev-vcs/git",
             "net-misc/curl",
             "usbutils",
-            "pciutils",
             "logrotate",
             "gptfdisk",
             "sys-block/gpart",
-            "net-misc/ntp",
             "net-fs/nfs-utils",
             "linux-firmware"
         ],
-        "additional": [],
+        "additional": [
+            "app-editors/vim",
+            "app-emulation/qemu-guest-agent",
+            "sys-process/cronie"
+        ],
         "oneshots": [
             "portage"
         ],
@@ -56,7 +67,7 @@
             "openssh"
         ],
         "bootloader": [
-            "grub:2"
+            "sys-boot/grub:2"
         ],
         "kernel": [
             "sys-kernel/genkernel",
@@ -65,14 +76,17 @@
         ]
     },
     "services": {
+        "sshd": "default",
         "syslog-ng": "default",
-        "cronie": "default",
         "acpid": "default",
-        "ntp": "default"
+        "nfsclient": "default",
+        "qemu-guest-agent": "default",
+        "cronie": "default"
     },
-    "iso": null,
     "portage": null,
     "stage3": null,
-    "disk": null,
-    "partition": 1
+    "disk": "/dev/vda",
+    "passwords": {
+        "root": "root"
+    }
 }
