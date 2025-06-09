@@ -23,7 +23,7 @@ Huge thanks to https://github.com/travisghansen/gentoo-cloud-image-builder for p
 
 ## Common Usage
 
-### QEMU:
+### Basic QEMU Build:
 
 QEMU builds a virtual image file that can be run in a virtualized environment
 
@@ -40,13 +40,20 @@ Once the image is virtualized, within qemu mount the available gentooimgr iso an
 mkdir -p /mnt/gi
 mount /dev/disk/by-label/gentooimgr /mnt/gi
 cd /mnt/gi
-python -m gentooimgr --config-cloud install
+python -m gentooimgr install
 python -m gentooimgr unchroot
 ```
 
 ...
 
-### Cloud-Image:
+### Cloud-Image Build:
+
+Complete the Basic QEMU Build but tkae the install action command and add the ``--config-cloud`` option. (This is a built-in configuration)
+
+```sh
+python -m gentooimgr --config-cloud install
+
+```
 
 Cloud-Image configures a qemu image that can be imported into network/kvm/hosting applications with direct ability to configure things such as hardware (network), passwords, ssh keys and more, sometimes without rebooting and makes administration outside of the virtualized environment very easy.
 
@@ -58,11 +65,14 @@ Important to note that the Gentoo minimal ppc cd does not include setuptools or 
 
 (change ``-config-ppc-64`` to ``--config-ppc-32`` if you prefer a 32-bit configuration)
 
+Load up the minimal iso image and run:
 
 ```sh
+cd /root
+git clone https://github.com/NucleaPeon/gentooimgr.git
 cd /root/gentooimgr
 python pyvenvex.py .
-bin/pip install -r requirements.txt .
+bin/pip install -r requirements.txt -e .
 bin/python -m gentooimgr -N -I --config-ppc-64 install
 # Or use --config-ppc-32
 ```
@@ -89,7 +99,7 @@ Thanks!
 
 * [X] Use gentooimgr to configure and Install a Base Gentoo OS using the least amount of configuration
 * [X] Use gentooimgr to create a usable cloud image without a binary dist kernel
-* [ ] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64, arm)
+* [X] Use gentooimgr to create Gentoo installations on other non-amd64/non-native architectures (ex: ppc64, arm)
 * [ ] Gentoo ARM doesn't have an iso available to download, so I will be producing one.
 * [ ] Allow better handling from image building third party software such as ansible and terraform
 * [ ] Build turnkey (LXC) images
@@ -108,7 +118,7 @@ Thanks!
 
 ## Using EFI
 
-Ensure you have ovmf installed. On Gentoo, the package name is ``sys-firmware/edk2-ovmf`` or ``sys-firmware/edk2-ovmf-bin``. the latter of which is brought in by ``app-emulation/qemu`` automatically. I prefer using the non-binary version, but I had to uninstall the binary package after qemu was built. The path for locating the firmware is ``/usr/share/edk2-ovmf/OVMF_CODE.fd``, it may be different for Debian-based systems. (Currently this can be set with the ``--efi-firmware`` command line option.)
+Ensure you have ``ovmf`` installed. On Gentoo, the package name is ``sys-firmware/edk2-ovmf`` or ``sys-firmware/edk2-ovmf-bin``. the latter of which is brought in by ``app-emulation/qemu`` automatically. I prefer using the non-binary version, but I had to uninstall the binary package after qemu was built. The path for locating the firmware is ``/usr/share/edk2-ovmf/OVMF_CODE.fd``, it may be different for Debian-based systems. (Currently this can be set with the ``--efi-firmware`` command line option.)
 
 For the ``run`` and ``install`` actions, you should add the global ``--use-efi`` option:
 
@@ -145,20 +155,29 @@ Remove the serial options in the grub menu to get the login prompt. (Keep the ``
 
 * ``--config-cloud`` will bring in the required components to create a cloud-init image
 * ``--config-qemu`` will bring in the required components to create a qemu-enabled image, runnable in qemu or by calling ``python -m gentooimgr run [resulting-image.qcow2]``
+* ``--config-ppc-64`` will build and install a PowerPC G5 sustem but must be run from the livecd. Use ``-N`` and ``-I`` (new world mac and install-only options)
 
-Omitting a configuration will result in a ``base`` configuration image.
+Omitting a configuration flag will result in a ``base`` configuration image being built.
 
-You can omit ``--config-cloud`` to create a basic gentoo image.
-
-Using a built-in configuration flag will look in ``gentooimgr/configs/cloud.config`` for the corresponding configuration.
-Writing your own configuration file and specifying an ``inherit``ed configuration will also look there if no absolute path is given.
+Using a built-in configuration flag will look in ``gentooimgr/configs/`` for the corresponding configuration.
+Writing your own configuration file and specifying an ``inherit``ed configuration will also look there for the inherited file if no absolute path is given.
 
 
 ```sh
 python -m gentooimgr shrink gentoo.qcow2
 ```
 
-**NOTE** Due to how ``gentooimgr`` dynamically finds the most recent portage/stage3 and iso files, if multiples exist in the same directory you may have to specify them using the appropriate flag (ie: ``--iso [path-to-iso]``). Older images can be used in this manner and eventually setting those values in the .json file should be recognized by gentooimgr so there will be no need to specify them on the command line.
+## Caveats
+
+* [ ] Due to how ``gentooimgr`` dynamically finds the most recent portage/stage3 and iso files, if multiples exist in the same directory you may have to specify them using the appropriate flag (ie: ``--iso [path-to-iso]``) or put the specific file in your config. Another way to ensure things are up to date and require no intervention is to run ``python -m gentooimgr clean`` before your build/run/install steps.
+
+* [X] Forced use of Rust in cloud images (cloud-init dependency)
+
+Unfortunately, using cloud-init brings in cryptography and oauthlib which pulls in rust. Any cloud images therefore are forced to use it, which is a large compilation target if rust-bin is not used. Some FOSS users, myself included, do not want rust installed on their systems and dislike how it is encroaching on so many FOSS areas.
+
+Work may be done to see if this can be avoided, but for now consider it a requirement.
+
+
 
 
 ## Extended Usage
@@ -195,7 +214,7 @@ python -m gentooimgr unchroot
 
 During my testing and development of this project, I found a couple notable concerns.
 
-* Occassionally cmake fails to build. Not sure why this is, could be caused by the next issue I foundnetworkmanager
+* Occassionally cmake fails to build. Not sure why this is, could be caused by the next issue I found:
 * Autoconf-wrapper was failing to emerge due to file collisions. I had to implement an ``-I /usr -I /etc`` option to get the build past the ``emerge @world`` step. My guess is autoconf had a new version but as a system tool, gentoo errs on the stability side of things.
 
 
@@ -225,7 +244,7 @@ after you set username and password)
 If you are having issues with EFI images on Proxmox, instead of using qcow2 image, **USE RAW IMAGE SETTINGS**:
 
 ```sh
-qm importdisk 1000 /tmp/gentoo-[stamp].qcow2 local -format raw
+qm importdisk 1000 /tmp/gentoo[-timestamp].qcow2 local -format raw
 qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-disk-0.raw
 ```
 
@@ -233,18 +252,14 @@ qm set 1000 --scsihw virtio-scsi-pci --scsi0 /var/lib/vz/images/1000/vm-1000-dis
 
 Unless using the ``--kernel-dist`` install action option, you will be building a ``genkernel`` kernel if 'genkernel' is found in your kernel packages. Otherwise it will build a ``gentoo-sources`` kernel. No downloading and configuring a kernel.org kernel yet.
 
+**(Building with kernel source is planned but not yet available)**
+
 With genkernel, the ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
 If you plan on making your own changes to the kernel and having it built automatically, edit and save THAT file, instead of simply saving your menuconfig changes.
 
 Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
 
 ## Caveats
-
-* [X] Forced use of Rust in cloud images (cloud-init dependency)
-
-Unfortunately, using cloud-init brings in cryptography and oauthlib which pulls in rust. Any cloud images therefore are forced to use it, which is a large compilation target if rust-bin is not used. Some FOSS users, myself included, do not want rust installed on their systems and dislike how it is encroaching on so many FOSS areas.
-
-Work may be done to see if this can be avoided, but for now consider it a requirement.
 
 
 ## TODO
