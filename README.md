@@ -259,14 +259,12 @@ If you plan on making your own changes to the kernel and having it built automat
 
 Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
 
-## Caveats
-
-
 ## TODO
 
 * [ ] Have a way to include custom make.conf in install process. (its own step?)
 * [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
 * [ ] Upload to ``pip``
+* [ ] Kernel source compilation during install phase. Potentially download during build phase.
 * [ ] Do a check for /mnt/gentoo/etc/resolv.conf and if not found, auto copy it when using the ``chroot`` action so user isn't left without network access.
 * [ ] EFI partition type functionality
 * [ ] Hash check portage downloads on ``build``
