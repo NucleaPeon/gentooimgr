@@ -21,7 +21,8 @@
         "cloud-final": "default",
         "net.lo": "default",
         "net.eth0": "default",
-        "ntpd": "default"
+        "ntpd": "default",
+        "sshd": "default"
     },
     "passwords": {
         "root": "root"
