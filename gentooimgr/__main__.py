@@ -171,10 +171,11 @@ if __name__ == "__main__":
 
     parser_install = subparsers.add_parser("install", help="Install Gentoo on a qemu guest. Defaults to "
                                            "--config-base with --kernel-dist if the respective --config or --kernel options are not provided.")
+    # TODO: I don't think these --kernel options are used, or used correctly.
     parser_install.add_argument("--kernel-virtio", action="store_true", help="Include virtio support in non-dist kernels")
     parser_install.add_argument("--kernel-g5", action="store_true", help="Include all kernel config options for PowerMac G5 compatibility")
     parser_install.add_argument("--step-prompt", action="store_true", help="If enabled, requires <enter> to be pressed after each step is complete (for debugging)")
-    parser_install.add_argument("-P", "--packages", nargs="*",
+    parser_install.add_argument("-P", "--packages", nargs="*", default=(),
                                 help="List of 'additional' packages to install on top of the current configured package list.")
     parser_install.add_argument("-S", "--services", nargs="*", help="Enable services; either specify the service name (ie: apache2) for "
                                 "a default level or service:level (ie: sshd:boot) for other levels. "

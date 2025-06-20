@@ -56,6 +56,7 @@ def kernel_copy_conf(args, config, inchroot=False) -> int:
         LOG.debug(f"\t:: Creating kernel configuration path {path}")
         os.makedirs(path, exist_ok=True)
         configfile = os.path.join(gentooimgr.configs.CONFIG_DIR, get_kernel_config_name(args, config) + ".config")
+        LOG.info(f"\t:: Looking for kernel configuration file {configfile}: {os.path.exists(configfile)}")
         if os.path.exists(configfile):
             LOG.debug(f"\t:: Config file {configfile} exists.")
             shutil.copyfile(configfile, kernelconf)
@@ -70,13 +71,14 @@ def kernel_copy_conf(args, config, inchroot=False) -> int:
 
 def chdir_kerneldir(args, inchroot=False):
     kerneldir = args.kernel_dir
-    LOG.info(f"Kernel dir {kerneldir}")
     if not inchroot:
         if kerneldir[0] == os.sep:
             kerneldir = kerneldir[1:] # remove '/' from
         kerneldir = os.path.join(os.sep, 'mnt', 'gentoo', kerneldir)
+    LOG.info(f"::\t Chdir'ing to kernel directory {kerneldir} ({'in chroot' if inchroot else 'not in chroot'})")
     os.chdir(kerneldir)
 
+""" Entrypoint from install.py """
 def build_kernel(args, config, inchroot=False) -> int:
     code = gentooimgr.errorcodes.SUCCESS
     if args.kernel_dist:
@@ -88,11 +90,12 @@ def build_kernel(args, config, inchroot=False) -> int:
         return code
 
     kerneldir = args.kernel_dir
-    LOG.info(f"Kernel dir {kerneldir}")
+    LOG.info(f"::\t Kernel dir {kerneldir}")
     chdir_kerneldir(args, inchroot=inchroot)
     # kernel_copy_conf needs to happen before this works correctly:
+    kernel_copy_conf(args, config, inchroot=inchroot)
     kernelconf = get_installed_kernel_config_path(args, config, inchroot)
-    LOG.info(f"\t:: Using kernel configuration {'default' if kernelconf is None else kernelconf}")
+    LOG.info(f"::\t Using kernel configuration {'default' if kernelconf is None else kernelconf}")
     if kernelconf is None:
         kernel_default_config(args, config)
 

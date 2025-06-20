@@ -33,7 +33,7 @@ STEPS = {
     5: "Portage",
     6: "Licenses",
     7: "Repo Configuration",
-    8: "Resolv",
+    8: "Resolv and Configs",
     9: "Emerge Sync",
     10: "Emerge Packages",
     11: "Kernel",
@@ -219,6 +219,11 @@ def step8_resolv(args, cfg):
     if not args.pretend:
         os.system(f"cp /tmp/*.step {cfg.get('mountpoint')}/tmp")
         os.system(f"cp -r . {cfg.get('mountpoint')}/mnt/")
+        # copying kernel configurations should be done before chroot
+        os.makedirs(os.path.join(cfg.get('mountpoint'), "etc", "kernels"), exist_ok=True)
+        os.makedirs(os.path.join(cfg.get('mountpoint'), "etc", "kernels", "config.d"), exist_ok=True)
+        cpath, kpath = gentooimgr.config.paths_from_config_name(args.config)
+
     completestep(args, 8, "resolv")
 
 def step9_sync(args, cfg):
@@ -273,7 +278,8 @@ def step10_emerge_pkgs(args, cfg):
     cmd = ["emerge", "-j", str(args.threads)]
     cmd += packages.get("base", [])
     cmd += packages.get("additional", [])
-    cmd += args.packages or []
+    if hasattr(args, "packages"):
+        cmd += args.packages or []
     run_cmd(args, cmd, env=env)
     try:
         run_cmd(args, ["eix-update"], env=env)
@@ -303,7 +309,7 @@ def step11_kernel(args, cfg):
 
                 else:
                     shutil.copyfile(os.path.join(path, f), os.path.join(os.sep, 'boot', f))
-                    LOG.debug(f"\t:: Copying {path}/{f} to /boot/{f}")
+                    LOG.debug(f"::\t Copying {path}/{f} to /boot/{f}")
 
     completestep(args, 11, "kernel")
 

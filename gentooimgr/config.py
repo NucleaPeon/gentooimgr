@@ -63,6 +63,23 @@ def load_config(path):
             return json.loads(f.read())
     return {}
 
+def paths_from_config_name(config_name):
+    """Returns a tuple of the json file and the kernel config file paths
+    """
+
+    cpath = os.path.join(gentooimgr.configs.CONFIG_DIR, config_name)
+    name, ext = os.path.splitext(config_name)
+    if not name in gentooimgr.configs.KNOWN_CONFIGS and not os.path.exists(cpath):
+        LOG.warn(f"Config json file {cpath} not found in known configurations")
+        return {}
+
+    kpath = os.path.join(gentooimgr.configs.CONFIG_DIR, name + ".config")
+    if not os.path.exists(kpath):
+        LOG.warn(f"Kernel config file {kpath} not found for {config_name}")
+
+
+    return (cpath, kpath,)
+
 def load_default_config(config_name):
     """This is called when a --config option is set. --kernel options update the resulting config, whether
     it be 'base' or other.
