@@ -57,7 +57,7 @@
         ],
         "singles": [
             "app-portage/eix",
-            "dev-util/cmake"
+            "dev-build/cmake"
         ],
         "keepgoing": [
             "openssh"
