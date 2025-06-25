@@ -111,7 +111,7 @@ Thanks!
 * [ ] python3.11 and pip (to install deps)
 * [ ] Recommended 20GB of space
 * [ ] Internet Connection
-* [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional)
+* [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional, found in ``app-emulation/libguestfs`` package)
 * [ ] OVMF firmware for using EFI enabled images (optional)
 * [ ] progressbar for python (dev-python/progressbar2 package if running on gentoo)
 
@@ -210,12 +210,23 @@ exit
 python -m gentooimgr unchroot
 ```
 
-## Encountered Issues
+## Encountered Issues / Troubleshooting
 
 During my testing and development of this project, I found a couple notable concerns.
 
 * Occassionally cmake fails to build. Not sure why this is, could be caused by the next issue I found:
 * Autoconf-wrapper was failing to emerge due to file collisions. I had to implement an ``-I /usr -I /etc`` option to get the build past the ``emerge @world`` step. My guess is autoconf had a new version but as a system tool, gentoo errs on the stability side of things.
+
+* Since dev-build/cmake package name was updated, I did encounter another issue while compiling cmake. It was along the lines of:
+
+```
+fatal error killed signal terminated program cc1plus 
+cmBuildCommand.o Error 1
+```
+
+A quick search seems to indicate that running a compile job with too many threads can increase memory to the point where there is an out of memory error, or something. We default to max # of threads, my system has 32. The ``run`` action has a command line flag ``--memory``/``-M`` that can be used to increase memory and resolve this problem.
+My system was set to vie gentooimgr 16GB of RAM and it compiled without error.
+
 
 
 ## Adding Image to Proxmox
@@ -254,13 +265,9 @@ Unless using the ``--kernel-dist`` install action option, you will be building a
 
 **(Building with kernel source is planned but not yet available)**
 
-With genkernel, the ``make menuconfig`` command will bring in the ``.config`` configuration file, but any changes will be lost unless you copy your configuration to the corresponding ``/etc/kernels/kernel-config-*gentoo-x86_64`` file or use the ``--save-config`` option in genkernel calls in tandem with ``--menuconfig``.
-If you plan on making your own changes to the kernel and having it built automatically, edit and save THAT file, instead of simply saving your menuconfig changes.
-
-Run ``genkernel all`` and if using efi, ``cp /usr/src/linux/arch/x86/boot/bzImage /boot/efi/EFI/gentoo/bootx64.efi``
-
 ## TODO
 
+* [ ] We already use max threads when compiling, but we'll need to increase memory too, so look at memory and if > 16GB use (8GB or 50% of memory whichever is more, otherwise use 4GB)
 * [ ] Have a way to include custom make.conf in install process. (its own step?)
 * [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
 * [ ] Upload to ``pip``

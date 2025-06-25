@@ -1,4 +1,5 @@
 {
+    "memory": 8192,
     "inherit": "base.json",
     "packages": {
         "additional": [

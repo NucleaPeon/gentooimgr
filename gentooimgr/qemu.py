@@ -10,6 +10,8 @@ import gentooimgr.errorcodes
 from gentooimgr.logging import LOG
 
 
+GENTOOIMGR_FALLBACK_MEMORY = 2048
+
 def create_image(args, config: dict, overwrite: bool = False) -> str:
     """Creates an image (.img) file using qemu that will be used to create the cloud image
 
@@ -95,7 +97,7 @@ def run_image(
     cmd = [
         config.get("qemu_prog", c.GENTOO_CMD),
         "-enable-kvm" if config.get("enable_kvm", False) else "",
-        "-m", str(config.get("memory", 2048)),
+        "-m", str(args.memory) if args.memory > 0 else str(config.get("memory", GENTOOIMGR_FALLBACK_MEMORY)),
         "-drive", f"file={image},if={'virtio' if c.ARCHITECTURE == 'amd64' else 'none'},index=0,format={ext}",
         "-net", "nic,model=virtio",
         "-net", "user",

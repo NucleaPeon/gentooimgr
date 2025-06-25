@@ -158,7 +158,8 @@ if __name__ == "__main__":
                             help="Path to iso files to mount into the running qemu instance")
     parser_run.add_argument("--use-live-cd", action="store_true",
                             help="Ensure that livecd iso is mounted and booted from. If there is no image or --iso specified, this is assumed.")
-
+    parser_run.add_argument("-M", "--memory", type=int, default=-1,
+                            help="Memory (in MB) to use in run action. Takes presidence over config file if > 0.")
     parser_test = subparsers.add_parser('test', help="Test whether image is a legitamite cloud configured image")
 
     parser_clean = subparsers.add_parser('clean', help="Remove all downloaded files")
@@ -166,7 +167,7 @@ if __name__ == "__main__":
 
     parser_step = subparsers.add_parser('step', help="Invoke an individual step")
     parser_step.add_argument("steps", nargs="+", default=(), type=int, help=f"Steps 0-{LAST_STEP}")
-
+    parser_step.add_argument("--rsync-repo", nargs="?", help="Set the gentoo rsync repo to this address (server name or ip address, ie: 192.168.1.50). Useful for testing / not spamming emerge repos. Applies to step 7 in particular.")
     parser_status = subparsers.add_parser('status', help="Review information, downloaded images and configurations")
 
     parser_install = subparsers.add_parser("install", help="Install Gentoo on a qemu guest. Defaults to "
@@ -183,6 +184,7 @@ if __name__ == "__main__":
     parser_install.add_argument("-I", "--ignore-collisions", nargs="+", default=None,
                                 help="Specify path to ignore collisions within. In the event that Gentoo fails to install dependencies on collision, "
                                 "set this to `-I /usr -I /etc`")
+    parser_install.add_argument("--rsync-repo", nargs="?", help="Set the gentoo rsync repo to this address (server name or ip address, ie: 192.168.1.50). Useful for testing / not spamming emerge repos.")
     parser_chroot = subparsers.add_parser("chroot", help="Bind mounts and enter chroot with shell on guest. Unmounts binds on shell exit.")
     parser_chroot.add_argument("mountpoint", nargs='?', default=gentooimgr.config.GENTOO_MOUNT,
                                help="Point to mount and run the chroot and shell.")

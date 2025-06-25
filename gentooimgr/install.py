@@ -23,6 +23,9 @@ from gentooimgr.logging import LOG
 
 from gentooimgr.configs import *
 
+# LEFTOFF FIXME : Have a way to specify thread count in every emerge command, maybe limit cmake?
+EMERGE_CMD = ["emerge", "-j", gentooimgr.config.THREADS]
+
 FILES_DIR = os.path.join(HERE, "..")
 
 STEPS = {
@@ -185,9 +188,19 @@ def step7_repos(args, cfg):
     if not args.pretend: os.makedirs(repo_path, exist_ok=True)
     # Copy from template
     repo_file = os.path.join(repo_path, 'gentoo.conf')
-    if not args.pretend: shutil.copyfile(
-        os.path.join(cfg.get("mountpoint"), 'usr', 'share', 'portage', 'config', 'repos.conf'),
-        repo_file)
+    if not args.pretend:
+        shutil.copyfile(
+            os.path.join(cfg.get("mountpoint"), 'usr', 'share', 'portage', 'config', 'repos.conf'),
+            repo_file)
+        if hasattr(args, "rsync_repo"):
+            if args.rsync_repo:
+                cp = configparser.ConfigParser()
+                cp.read(repo_file)
+                cp.set("gentoo", "sync-uri", f"rsync://{args.rsync_repo}/gentoo-portage")
+                cp.write(open(repo_file, 'w'))
+                LOG.info(f"\t:: Wrote gentoo repository to use {args.rsync_repo}")
+
+
     LOG.info(f"\t:: Repo configuration file copied {repo_file}")
     # Regex replace lines
     if not args.pretend:
@@ -233,7 +246,10 @@ def step9_sync(args, cfg):
     if args.ignore_collisions:
         os.environ['COLLISION_IGNORE'] = f"{' '.join(args.ignore_collisions)}"
     os.system("source /etc/profile")
-    run_cmd(args, ["emerge", "--sync", "--quiet"])
+    emergecmd = ["emerge", "--sync"]
+    if not args.debug:
+        emergecmd .append("--quiet")
+    run_cmd(args, emergecmd)
     LOG.debug("\t:: Sync'd")
     LOG.info("\t:: Emerging base")
     run_cmd(args, ["emerge", "--update", "--deep", "--newuse", "--keep-going", "@world"], env=env)
@@ -506,8 +522,9 @@ def prechroot(args, cfg):
     """
     LOG.info("\t::Doing some pre-chroot work")
     gentooimgr.kernel.kernel_copy_conf(args, cfg, not os.path.exists('/mnt/gentoo'))
-    exists = os.path.exists(cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH))
-    LOG.info(f"\t::Kernel configuration exists: {exists}")
+    path = cfg.get("kernel", {}).get("path", gentooimgr.kernel.DEFAULT_KERNEL_CONFIG_PATH)
+    exists = os.path.exists(path)
+    LOG.info(f"\t::Kernel configuration exists: {exists} {path}")
 
 def chrootfunc(args, cfg):
     # Move chroot out of step 9 and place it here, butcfg ensure we are at the point (or greater) where this is needed:

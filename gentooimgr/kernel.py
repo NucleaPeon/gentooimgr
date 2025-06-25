@@ -25,6 +25,14 @@ def get_kernel_config_name(args, config):
         return None
     f, ext = os.path.splitext(kernelconf)  # args.config may have .json extension
     name = os.path.basename(f)
+    return f"gentooimgr-{name}"
+
+def get_base_config_name(args, config):
+    kernelconf = config.get("kernel", {}).get("config") or args.config
+    if kernelconf is None:
+        return None
+    f, ext = os.path.splitext(kernelconf)  # args.config may have .json extension
+    name = os.path.basename(f)
     return name
 
 def get_installed_kernel_config_path(args, config, inchroot):
@@ -41,7 +49,7 @@ def get_installed_kernel_config_path(args, config, inchroot):
     try:
         kconf = args.kconf
     except AttributeError as aE:
-        kconf = os.path.join(kerneldir, f'gentooimgr-{name}.config')
+        kconf = os.path.join(kerneldir, f'{name}.config')
     return kconf
 
 def kernel_copy_conf(args, config, inchroot=False) -> int:
@@ -55,7 +63,8 @@ def kernel_copy_conf(args, config, inchroot=False) -> int:
         path = os.path.dirname(kernelconf)
         LOG.debug(f"\t:: Creating kernel configuration path {path}")
         os.makedirs(path, exist_ok=True)
-        configfile = os.path.join(gentooimgr.configs.CONFIG_DIR, get_kernel_config_name(args, config) + ".config")
+
+        configfile = os.path.join(gentooimgr.configs.CONFIG_DIR, f"{get_base_config_name(args, config)}.config")
         LOG.info(f"\t:: Looking for kernel configuration file {configfile}: {os.path.exists(configfile)}")
         if os.path.exists(configfile):
             LOG.debug(f"\t:: Config file {configfile} exists.")
@@ -102,6 +111,7 @@ def build_kernel(args, config, inchroot=False) -> int:
     cmd = []
     has_genkernel = False
     for pkg in config.get("packages", {}).get("kernel", []):
+        LOG.debug(f"\t:: Kernel package {pkg}")
         if "genkernel" in pkg:
             has_genkernel = True
             cmd = ['genkernel', f'--kernel-config={kernelconf}', '--no-menuconfig']
