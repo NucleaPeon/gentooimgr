@@ -111,7 +111,7 @@ Thanks!
 * [ ] python3.11 and pip (to install deps)
 * [ ] Recommended 20GB of space
 * [ ] Internet Connection
-* [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional, found in ``app-emulation/libguestfs`` package)
+* [ ] virt-sparsify (for use with `gentooimgr shrink` action, optional, found in ``app-emulation/guestfs-tools`` package)
 * [ ] OVMF firmware for using EFI enabled images (optional)
 * [ ] progressbar for python (dev-python/progressbar2 package if running on gentoo)
 
@@ -267,10 +267,10 @@ Unless using the ``--kernel-dist`` install action option, you will be building a
 
 ## TODO
 
-* [ ] We already use max threads when compiling, but we'll need to increase memory too, so look at memory and if > 16GB use (8GB or 50% of memory whichever is more, otherwise use 4GB)
+* [ ] We already use max threads when compiling. Check total memory and allocate a more considerate amount if available. ie: 16GB of RAM should allow up to 8GB to qemu. No more than 50% unless explicitly set.
 * [ ] Have a way to include custom make.conf in install process. (its own step?)
 * [ ] Have a way to brand a produced image with its config name (ie: gentoo-cloud.qcow2, gentoo-qemu.qcow2, etc.)
-* [ ] Upload to ``pip``
+* [ ] Upload this code to ``pip``
 * [ ] Kernel source compilation during install phase. Potentially download during build phase.
 * [ ] Do a check for /mnt/gentoo/etc/resolv.conf and if not found, auto copy it when using the ``chroot`` action so user isn't left without network access.
 * [ ] EFI partition type functionality
